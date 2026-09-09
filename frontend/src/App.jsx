@@ -11,6 +11,9 @@ import { useDarkMode } from "./useDarkMode";
 export default function App() {
   const [isDark, setIsDark] = useDarkMode();
 
+  // Simple manual routing for the one public route this app needs - no
+  // router library required. /share/<token> renders a read-only view with
+  // no auth, everything else renders the normal authenticated app.
   const shareMatch = window.location.pathname.match(/^\/share\/([^/]+)/);
   if (shareMatch) {
     return <SharedChatView token={shareMatch[1]} />;
@@ -27,7 +30,14 @@ export default function App() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [activeMessages, setActiveMessages] = useState([]);
   const [pendingAsk, setPendingAsk] = useState(null);
+  // Separate remount trigger for ChatPanel - only bumped on an EXPLICIT
+  // "New chat" click or picking a different chat from the sidebar. A
+  // session ID that appears mid-conversation (auto-created by the first
+  // message of a new chat) must NOT remount ChatPanel, or the in-progress
+  // streamed answer disappears from view even though it saved fine.
   const [chatKey, setChatKey] = useState(0);
+  const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
+  const [mobileDocsOpen, setMobileDocsOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -57,6 +67,7 @@ export default function App() {
     refreshDocuments();
     refreshSessions();
 
+    // poll documents while any are processing, so status updates live
     const interval = setInterval(() => {
       refreshDocuments();
     }, 4000);
@@ -77,6 +88,10 @@ export default function App() {
   }
 
   function handleSessionCreated(id) {
+    // Intentionally does NOT touch chatKey - this fires mid-conversation
+    // when a brand-new chat's first message creates its session on the
+    // backend. Remounting here would wipe the answer that's still
+    // streaming/just streamed, even though it saved correctly server-side.
     setActiveSessionId(id);
     refreshSessions();
   }
@@ -105,35 +120,60 @@ export default function App() {
   const activeSession = sessions.find((s) => s.id === activeSessionId);
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden">
-      <SessionSidebar
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelect={handleSelectSession}
-        onNewChat={handleNewChat}
-        user={user}
-        onLogout={handleLogout}
-        isDark={isDark}
-        setIsDark={setIsDark}
-        onSessionsChanged={refreshSessions}
-        onOpenProfile={() => setShowProfile(true)}
-      />
-      <DocumentSidebar
-        documents={documents}
-        refreshDocuments={refreshDocuments}
-        selectedDocIds={selectedDocIds}
-        setSelectedDocIds={setSelectedDocIds}
-        onAskSuggested={(question) => setPendingAsk({ text: question, key: Date.now() })}
-      />
-      <ChatPanel
-        key={chatKey}
-        sessionId={activeSessionId}
-        setSessionId={handleSessionCreated}
-        selectedDocIds={selectedDocIds}
-        initialMessages={activeMessages}
-        sessionTitle={activeSession?.title}
-        pendingAsk={pendingAsk}
-      />
+    <div className="h-screen w-screen flex flex-col overflow-hidden">
+      {/* Mobile top bar - hidden on desktop, gives access to both drawers */}
+      <div className="md:hidden flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+        <button
+          onClick={() => setMobileSessionsOpen(true)}
+          className="p-2 text-gray-600 dark:text-gray-300"
+          aria-label="Open chat history"
+        >
+          ☰
+        </button>
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">DocChat</span>
+        <button
+          onClick={() => setMobileDocsOpen(true)}
+          className="p-2 text-gray-600 dark:text-gray-300"
+          aria-label="Open documents"
+        >
+          📄
+        </button>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        <SessionSidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelect={handleSelectSession}
+          onNewChat={handleNewChat}
+          user={user}
+          onLogout={handleLogout}
+          isDark={isDark}
+          setIsDark={setIsDark}
+          onSessionsChanged={refreshSessions}
+          onOpenProfile={() => setShowProfile(true)}
+          mobileOpen={mobileSessionsOpen}
+          onCloseMobile={() => setMobileSessionsOpen(false)}
+        />
+        <DocumentSidebar
+          documents={documents}
+          refreshDocuments={refreshDocuments}
+          selectedDocIds={selectedDocIds}
+          setSelectedDocIds={setSelectedDocIds}
+          onAskSuggested={(question) => setPendingAsk({ text: question, key: Date.now() })}
+          mobileOpen={mobileDocsOpen}
+          onCloseMobile={() => setMobileDocsOpen(false)}
+        />
+        <ChatPanel
+          key={chatKey}
+          sessionId={activeSessionId}
+          setSessionId={handleSessionCreated}
+          selectedDocIds={selectedDocIds}
+          initialMessages={activeMessages}
+          sessionTitle={activeSession?.title}
+          pendingAsk={pendingAsk}
+        />
+      </div>
 
       {showProfile && (
         <ProfileModal user={user} onClose={() => setShowProfile(false)} onUpdated={setUser} />

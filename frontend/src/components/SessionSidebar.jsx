@@ -12,6 +12,8 @@ export default function SessionSidebar({
   setIsDark,
   onSessionsChanged,
   onOpenProfile,
+  mobileOpen,
+  onCloseMobile,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
@@ -44,33 +46,59 @@ export default function SessionSidebar({
 
   const initials = (user?.full_name || user?.email || "?").slice(0, 1).toUpperCase();
 
-  return (
-    <aside className="w-64 bg-gray-900 dark:bg-black text-gray-200 flex flex-col h-full">
-      <div className="p-4 border-b border-gray-800 flex gap-2">
-        <button
-          onClick={onNewChat}
-          className="flex-1 text-sm font-medium bg-white/10 hover:bg-white/20 rounded-lg py-2 transition"
-        >
-          + New chat
-        </button>
-        <button
-          onClick={() => setIsDark(!isDark)}
-          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-          className="w-10 shrink-0 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition"
-        >
-          {isDark ? "☀️" : "🌙"}
-        </button>
-      </div>
+  async function handleSelect(id) {
+    onSelect(id);
+    onCloseMobile && onCloseMobile();
+  }
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-1">
-        {sessions.map((s) => (
-          <div
-            key={s.id}
-            onClick={() => editingId !== s.id && onSelect(s.id)}
-            className={`group flex items-center gap-1 rounded-lg px-1 transition ${
-              activeSessionId === s.id ? "bg-white/15" : "hover:bg-white/5"
-            }`}
+  return (
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={onCloseMobile}
+        />
+      )}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-gray-900 dark:bg-black text-gray-200 flex flex-col h-full transition-transform duration-200 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        <div className="p-4 border-b border-gray-800 flex gap-2">
+          <button
+            onClick={() => {
+              onNewChat();
+              onCloseMobile && onCloseMobile();
+            }}
+            className="flex-1 text-sm font-medium bg-white/10 hover:bg-white/20 rounded-lg py-2 transition"
           >
+            + New chat
+          </button>
+          <button
+            onClick={() => setIsDark(!isDark)}
+            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            className="w-10 shrink-0 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition"
+          >
+            {isDark ? "☀️" : "🌙"}
+          </button>
+          <button
+            onClick={onCloseMobile}
+            className="w-10 shrink-0 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition md:hidden"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-1">
+          {sessions.map((s) => (
+            <div
+              key={s.id}
+              onClick={() => editingId !== s.id && handleSelect(s.id)}
+              className={`group flex items-center gap-1 rounded-lg px-1 transition ${
+                activeSessionId === s.id ? "bg-white/15" : "hover:bg-white/5"
+              }`}
+            >
             {editingId === s.id ? (
               <input
                 autoFocus
@@ -121,5 +149,6 @@ export default function SessionSidebar({
         </button>
       </div>
     </aside>
+    </>
   );
 }
