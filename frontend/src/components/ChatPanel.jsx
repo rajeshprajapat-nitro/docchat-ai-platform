@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+
 import { streamQuery, shareSession } from "../api";
 import Citations from "./Citations";
 
@@ -15,15 +16,18 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState(null);
+
   const [useWeb, setUseWeb] = useState(
     () => localStorage.getItem("docchat-web-default") === "true"
   );
+
   const [editingIdx, setEditingIdx] = useState(null);
   const [shareStatus, setShareStatus] = useState("");
 
-  // AI unavailable / retry timer
+  // AI unavailable / retry
   const [aiUnavailable, setAiUnavailable] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState(45);
+  const [failedRequest, setFailedRequest] = useState(null);
 
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
@@ -38,16 +42,23 @@ export default function ChatPanel({
     if (pendingAsk?.text) {
       handleSend(null, pendingAsk.text);
     }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAsk?.key]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
+    });
   }, [messages]);
 
+  // -----------------------------------------
   // AI unavailable countdown
+  // -----------------------------------------
   useEffect(() => {
-    if (!aiUnavailable || retryCountdown <= 0) return;
+    if (!aiUnavailable || retryCountdown <= 0) {
+      return;
+    }
 
     const timer = setInterval(() => {
       setRetryCountdown((prev) => Math.max(prev - 1, 0));
@@ -56,14 +67,21 @@ export default function ChatPanel({
     return () => clearInterval(timer);
   }, [aiUnavailable, retryCountdown]);
 
+  // -----------------------------------------
+  // Auto resize textarea
+  // -----------------------------------------
   function autoResize() {
     const el = textareaRef.current;
+
     if (!el) return;
 
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }
 
+  // -----------------------------------------
+  // Detect AI rate-limit / quota errors
+  // -----------------------------------------
   function isAIUnavailableError(error) {
     const message =
       typeof error === "string"
@@ -73,30 +91,49 @@ export default function ChatPanel({
     const lowerMessage = message.toLowerCase();
 
     return (
-      lowerMessage.includes("ai model is temporarily unavailable") ||
+      lowerMessage.includes(
+        "ai model is temporarily unavailable"
+      ) ||
       lowerMessage.includes("all configured key") ||
       lowerMessage.includes("rate-limit") ||
       lowerMessage.includes("rate limit") ||
+      lowerMessage.includes("rate_limit") ||
       lowerMessage.includes("quota") ||
       lowerMessage.includes("resource exhausted") ||
-      lowerMessage.includes("429")
+      lowerMessage.includes("resource_exhausted") ||
+      lowerMessage.includes("too many requests") ||
+      lowerMessage.includes("429") ||
+      lowerMessage.includes("temporarily unavailable")
     );
   }
 
-  function showAIUnavailable() {
+  // -----------------------------------------
+  // Show unavailable card
+  // -----------------------------------------
+  function showAIUnavailable(userText, targetIndex) {
     setAiUnavailable(true);
     setRetryCountdown(45);
+
+    setFailedRequest({
+      text: userText,
+      targetIndex,
+    });
   }
 
+  // -----------------------------------------
+  // Hide unavailable card
+  // -----------------------------------------
   function hideAIUnavailable() {
     setAiUnavailable(false);
     setRetryCountdown(45);
   }
 
+  // -----------------------------------------
+  // Stream AI response
+  // -----------------------------------------
   function runStream(userText, targetIndex) {
     setStreaming(true);
 
-    // Hide previous unavailable message when trying again
     hideAIUnavailable();
 
     const controller = new AbortController();
@@ -104,7 +141,9 @@ export default function ChatPanel({
 
     function patchMessage(patch) {
       setMessages((prev) => {
-        if (targetIndex >= prev.length) return prev;
+        if (targetIndex >= prev.length) {
+          return prev;
+        }
 
         const updated = [...prev];
 
@@ -120,68 +159,117 @@ export default function ChatPanel({
     streamQuery({
       sessionId,
       message: userText,
-      documentIds: selectedDocIds.length ? selectedDocIds : null,
+      documentIds: selectedDocIds?.length
+        ? selectedDocIds
+        : null,
       useWeb,
       signal: controller.signal,
 
+      // -----------------------------------------
+      // Session ID
+      // -----------------------------------------
       onSessionId: (id) => {
-        if (!sessionId) setSessionId(id);
+        if (!sessionId) {
+          setSessionId(id);
+        }
       },
 
+      // -----------------------------------------
+      // Token
+      // -----------------------------------------
       onToken: (token) => {
         setMessages((prev) => {
-          if (targetIndex >= prev.length) return prev;
+          if (targetIndex >= prev.length) {
+            return prev;
+          }
 
           const updated = [...prev];
 
           updated[targetIndex] = {
             ...updated[targetIndex],
-            content: (updated[targetIndex].content || "") + token,
+            content:
+              (updated[targetIndex].content || "") +
+              token,
           };
 
           return updated;
         });
       },
 
+      // -----------------------------------------
+      // Citations
+      // -----------------------------------------
       onCitations: (citations) => {
-        patchMessage({ citations });
-        setStreaming(false);
+        patchMessage({
+          citations,
+        });
       },
 
+      // -----------------------------------------
+      // Suggestions
+      // -----------------------------------------
       onSuggestions: (suggestions) => {
-        patchMessage({ suggestions });
+        patchMessage({
+          suggestions,
+        });
       },
 
+      // -----------------------------------------
+      // Groundedness
+      // -----------------------------------------
       onGroundedness: (groundedness) => {
-        patchMessage({ groundedness });
+        patchMessage({
+          groundedness,
+        });
       },
 
+      // -----------------------------------------
+      // Done
+      // -----------------------------------------
       onDone: () => {
         setStreaming(false);
+        abortRef.current = null;
       },
 
+      // -----------------------------------------
+      // Error
+      // -----------------------------------------
       onError: (error) => {
         setStreaming(false);
+        abortRef.current = null;
 
-        console.error("[DocChat] Stream error:", error);
+        console.error(
+          "[DocChat] Stream error:",
+          error
+        );
 
         if (isAIUnavailableError(error)) {
-          showAIUnavailable();
+          showAIUnavailable(
+            userText,
+            targetIndex
+          );
         }
       },
     });
   }
 
+  // -----------------------------------------
+  // Send message
+  // -----------------------------------------
   async function handleSend(e, overrideText) {
     e?.preventDefault();
 
     const text = (overrideText ?? input).trim();
 
-    if (!text || streaming) return;
+    if (!text || streaming) {
+      return;
+    }
 
     hideAIUnavailable();
+    setFailedRequest(null);
 
     setInput("");
+
     requestAnimationFrame(autoResize);
 
     const targetIndex = messages.length + 1;
@@ -203,14 +291,58 @@ export default function ChatPanel({
     runStream(text, targetIndex);
   }
 
+  // -----------------------------------------
+  // Retry failed AI request
+  // -----------------------------------------
+  function handleRetry() {
+    if (streaming || !failedRequest) {
+      return;
+    }
+
+    const {
+      text,
+      targetIndex,
+    } = failedRequest;
+
+    hideAIUnavailable();
+
+    // Clear the previous failed assistant response
+    setMessages((prev) => {
+      if (targetIndex >= prev.length) {
+        return prev;
+      }
+
+      const updated = [...prev];
+
+      updated[targetIndex] = {
+        role: "assistant",
+        content: "",
+        citations: [],
+        suggestions: [],
+      };
+
+      return updated;
+    });
+
+    runStream(text, targetIndex);
+  }
+
+  // -----------------------------------------
+  // Regenerate response
+  // -----------------------------------------
   function handleRegenerate(assistantIdx) {
-    if (streaming) return;
+    if (streaming) {
+      return;
+    }
 
     const userMsg = messages[assistantIdx - 1];
 
-    if (!userMsg || userMsg.role !== "user") return;
+    if (!userMsg || userMsg.role !== "user") {
+      return;
+    }
 
     hideAIUnavailable();
+    setFailedRequest(null);
 
     setMessages((prev) => {
       const updated = [...prev];
@@ -225,9 +357,15 @@ export default function ChatPanel({
       return updated;
     });
 
-    runStream(userMsg.content, assistantIdx);
+    runStream(
+      userMsg.content,
+      assistantIdx
+    );
   }
 
+  // -----------------------------------------
+  // Edit user message
+  // -----------------------------------------
   function handleStartEdit(idx) {
     setEditingIdx(idx);
   }
@@ -237,9 +375,12 @@ export default function ChatPanel({
 
     setEditingIdx(null);
 
-    if (!text || streaming) return;
+    if (!text || streaming) {
+      return;
+    }
 
     hideAIUnavailable();
+    setFailedRequest(null);
 
     setMessages((prev) => [
       ...prev.slice(0, idx),
@@ -258,24 +399,43 @@ export default function ChatPanel({
     runStream(text, idx + 1);
   }
 
+  // -----------------------------------------
+  // Suggestion click
+  // -----------------------------------------
   function handleSuggestionClick(text) {
-    if (streaming) return;
+    if (streaming) {
+      return;
+    }
 
     handleSend(null, text);
   }
 
+  // -----------------------------------------
+  // Stop streaming
+  // -----------------------------------------
   function handleStop() {
     abortRef.current?.abort();
+
     setStreaming(false);
+    abortRef.current = null;
   }
 
+  // -----------------------------------------
+  // Keyboard
+  // -----------------------------------------
   function handleKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey
+    ) {
       e.preventDefault();
       handleSend();
     }
   }
 
+  // -----------------------------------------
+  // Copy
+  // -----------------------------------------
   async function handleCopy(text, idx) {
     try {
       await navigator.clipboard.writeText(text);
@@ -283,33 +443,51 @@ export default function ChatPanel({
       setCopiedIdx(idx);
 
       setTimeout(() => {
-        setCopiedIdx((cur) => (cur === idx ? null : cur));
+        setCopiedIdx((cur) =>
+          cur === idx ? null : cur
+        );
       }, 1500);
     } catch {
       // Clipboard unavailable
     }
   }
 
+  // -----------------------------------------
+  // Web toggle
+  // -----------------------------------------
   function toggleWeb() {
     setUseWeb((v) => {
-      localStorage.setItem("docchat-web-default", String(!v));
+      localStorage.setItem(
+        "docchat-web-default",
+        String(!v)
+      );
+
       return !v;
     });
   }
 
+  // -----------------------------------------
+  // Share
+  // -----------------------------------------
   async function handleShare() {
-    if (!sessionId) return;
+    if (!sessionId) {
+      return;
+    }
 
     setShareStatus("sharing");
 
     try {
-      const url = await shareSession(sessionId);
+      const url = await shareSession(
+        sessionId
+      );
 
       await navigator.clipboard.writeText(url);
 
       setShareStatus("copied");
 
-      setTimeout(() => setShareStatus(""), 2000);
+      setTimeout(() => {
+        setShareStatus("");
+      }, 2000);
     } catch {
       setShareStatus("");
     }
@@ -322,7 +500,10 @@ export default function ChatPanel({
       <div className="flex items-center justify-end px-3 sm:px-4 py-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <button
           onClick={handleShare}
-          disabled={!sessionId || shareStatus === "sharing"}
+          disabled={
+            !sessionId ||
+            shareStatus === "sharing"
+          }
           className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 disabled:opacity-40 flex items-center gap-1"
           title={
             sessionId
@@ -348,8 +529,10 @@ export default function ChatPanel({
             </p>
 
             <p className="text-sm mt-1 leading-6 max-w-md mx-auto">
-              I'll use your uploaded documents and the live web when useful —
-              or just my own knowledge if nothing else fits.
+              I'll use your uploaded documents
+              and the live web when useful —
+              or just my own knowledge if nothing
+              else fits.
             </p>
           </div>
         )}
@@ -372,6 +555,7 @@ export default function ChatPanel({
                   : "bg-gray-50/70 dark:bg-gray-900/40"
               }`}
             >
+
               {/* Message container */}
               <div className="w-full max-w-3xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 flex gap-3 sm:gap-4">
 
@@ -393,8 +577,12 @@ export default function ChatPanel({
                     editingIdx === i ? (
                       <EditBox
                         initialText={m.content}
-                        onSubmit={(t) => handleSubmitEdit(i, t)}
-                        onCancel={() => setEditingIdx(null)}
+                        onSubmit={(t) =>
+                          handleSubmitEdit(i, t)
+                        }
+                        onCancel={() =>
+                          setEditingIdx(null)
+                        }
                       />
                     ) : (
                       <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-gray-800 dark:text-gray-100">
@@ -411,13 +599,17 @@ export default function ChatPanel({
 
                   {/* Citations */}
                   {!isUser && (
-                    <Citations citations={m.citations} />
+                    <Citations
+                      citations={m.citations}
+                    />
                   )}
 
                   {/* Groundedness */}
                   {!isUser && m.content && (
                     <GroundednessBadge
-                      groundedness={m.groundedness}
+                      groundedness={
+                        m.groundedness
+                      }
                     />
                   )}
 
@@ -426,8 +618,14 @@ export default function ChatPanel({
                     m.content &&
                     editingIdx !== i && (
                       <div className="mt-2 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition">
+
                         <button
-                          onClick={() => handleCopy(m.content, i)}
+                          onClick={() =>
+                            handleCopy(
+                              m.content,
+                              i
+                            )
+                          }
                           className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400"
                         >
                           {copiedIdx === i
@@ -436,43 +634,54 @@ export default function ChatPanel({
                         </button>
 
                         <button
-                          onClick={() => handleRegenerate(i)}
+                          onClick={() =>
+                            handleRegenerate(i)
+                          }
                           disabled={streaming}
                           className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 disabled:opacity-40"
                         >
                           ↻ Regenerate
                         </button>
 
-                        <SpeakButton text={m.content} />
+                        <SpeakButton
+                          text={m.content}
+                        />
                       </div>
                     )}
 
                   {/* User edit */}
-                  {isUser && editingIdx !== i && (
-                    <button
-                      onClick={() => handleStartEdit(i)}
-                      className="mt-1 text-[11px] text-gray-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 opacity-0 group-hover:opacity-100 transition"
-                    >
-                      ✎ Edit
-                    </button>
-                  )}
+                  {isUser &&
+                    editingIdx !== i && (
+                      <button
+                        onClick={() =>
+                          handleStartEdit(i)
+                        }
+                        className="mt-1 text-[11px] text-gray-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        ✎ Edit
+                      </button>
+                    )}
 
                   {/* Suggestions */}
                   {isLastAssistant &&
                     m.suggestions &&
                     m.suggestions.length > 0 && (
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {m.suggestions.map((s, si) => (
-                          <button
-                            key={si}
-                            onClick={() =>
-                              handleSuggestionClick(s)
-                            }
-                            className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400 px-3 py-1.5 rounded-full transition"
-                          >
-                            {s}
-                          </button>
-                        ))}
+                        {m.suggestions.map(
+                          (s, si) => (
+                            <button
+                              key={si}
+                              onClick={() =>
+                                handleSuggestionClick(
+                                  s
+                                )
+                              }
+                              className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400 px-3 py-1.5 rounded-full transition"
+                            >
+                              {s}
+                            </button>
+                          )
+                        )}
                       </div>
                     )}
                 </div>
@@ -484,9 +693,12 @@ export default function ChatPanel({
         <div ref={bottomRef} />
       </div>
 
-      {/* AI unavailable card */}
+      {/* =========================================
+          AI UNAVAILABLE CARD
+          ========================================= */}
       {aiUnavailable && (
         <div className="w-full max-w-3xl mx-auto px-3 pb-3 shrink-0">
+
           <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-500/10 p-4 sm:p-5 text-center">
 
             <div className="text-2xl mb-2">
@@ -498,36 +710,43 @@ export default function ChatPanel({
             </h3>
 
             <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md mx-auto">
-              The AI service is temporarily rate-limited.
-              Please wait a moment and try again.
+              The AI service is temporarily
+              rate-limited. Please wait a moment
+              and try again.
             </p>
 
+            {/* Countdown */}
             {retryCountdown > 0 ? (
               <div className="mt-3 inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-brand-600 dark:text-brand-400">
                 <span>⏳</span>
+
                 <span>
-                  Try again in {retryCountdown}s
+                  Try again in{" "}
+                  <strong>
+                    {retryCountdown}s
+                  </strong>
                 </span>
               </div>
             ) : (
               <button
                 type="button"
-                onClick={() => {
-                  hideAIUnavailable();
-                  textareaRef.current?.focus();
-                }}
-                className="mt-3 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-medium transition"
+                onClick={handleRetry}
+                disabled={
+                  streaming ||
+                  !failedRequest
+                }
+                className="mt-3 px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ↻ Retry Now
               </button>
             )}
-
           </div>
         </div>
       )}
 
       {/* Bottom composer */}
       <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-3 py-2.5 sm:p-4 shrink-0">
+
         <form
           onSubmit={handleSend}
           className="w-full max-w-3xl mx-auto flex items-center gap-2"
@@ -535,6 +754,7 @@ export default function ChatPanel({
 
           {/* Text input */}
           <div className="flex-1 relative min-w-0">
+
             <textarea
               ref={textareaRef}
               rows={1}
@@ -567,7 +787,7 @@ export default function ChatPanel({
             </button>
           </div>
 
-          {/* Voice button */}
+          {/* Voice input */}
           <VoiceInputButton
             disabled={streaming}
             onResult={(transcript) => {
@@ -577,11 +797,13 @@ export default function ChatPanel({
                   : transcript
               );
 
-              requestAnimationFrame(autoResize);
+              requestAnimationFrame(
+                autoResize
+              );
             }}
           />
 
-          {/* Send / Stop button */}
+          {/* Send / Stop */}
           {streaming ? (
             <button
               type="button"
@@ -589,6 +811,7 @@ export default function ChatPanel({
               className="shrink-0 h-10 sm:h-11 px-3.5 sm:px-5 bg-red-600 hover:bg-red-700 text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium flex items-center justify-center"
             >
               ■
+
               <span className="hidden sm:inline ml-1">
                 Stop
               </span>
@@ -613,17 +836,32 @@ export default function ChatPanel({
   );
 }
 
-function EditBox({ initialText, onSubmit, onCancel }) {
-  const [text, setText] = useState(initialText);
+// =====================================================
+// EDIT BOX
+// =====================================================
+
+function EditBox({
+  initialText,
+  onSubmit,
+  onCancel,
+}) {
+  const [text, setText] =
+    useState(initialText);
 
   return (
     <div className="space-y-2">
+
       <textarea
         autoFocus
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) =>
+          setText(e.target.value)
+        }
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
+          if (
+            e.key === "Enter" &&
+            !e.shiftKey
+          ) {
             e.preventDefault();
             onSubmit(text);
           }
@@ -637,25 +875,37 @@ function EditBox({ initialText, onSubmit, onCancel }) {
       />
 
       <div className="flex gap-2">
+
         <button
-          onClick={() => onSubmit(text)}
+          type="button"
+          onClick={() =>
+            onSubmit(text)
+          }
           className="text-xs bg-brand-600 hover:bg-brand-700 text-white px-3 py-1 rounded-lg"
         >
           Save & resend
         </button>
 
         <button
+          type="button"
           onClick={onCancel}
           className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         >
           Cancel
         </button>
+
       </div>
     </div>
   );
 }
 
-function GroundednessBadge({ groundedness }) {
+// =====================================================
+// GROUNDEDNESS BADGE
+// =====================================================
+
+function GroundednessBadge({
+  groundedness,
+}) {
   if (
     !groundedness ||
     groundedness.score === undefined
@@ -663,7 +913,10 @@ function GroundednessBadge({ groundedness }) {
     return null;
   }
 
-  const { score, note } = groundedness;
+  const {
+    score,
+    note,
+  } = groundedness;
 
   if (score < 0) {
     return (
@@ -672,7 +925,9 @@ function GroundednessBadge({ groundedness }) {
         title={note}
       >
         <span>💭</span>
-        <span>General knowledge (no sources)</span>
+        <span>
+          General knowledge (no sources)
+        </span>
       </div>
     );
   }
@@ -694,21 +949,31 @@ function GroundednessBadge({ groundedness }) {
   );
 }
 
+// =====================================================
+// SPEAK BUTTON
+// =====================================================
+
 function SpeakButton({ text }) {
-  const [speaking, setSpeaking] = useState(false);
+  const [speaking, setSpeaking] =
+    useState(false);
 
   function stripMarkdown(md) {
     return md
       .replace(/\[\d+\]/g, "")
-      .replace(/[\*\_\#\`>]/g, "")
+      .replace(/[*_#`>]/g, "")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/\s+/g, " ")
       .trim();
   }
 
   function handleClick() {
-    if (!("speechSynthesis" in window)) {
-      alert("Voice output isn't supported in this browser.");
+    if (
+      !("speechSynthesis" in window)
+    ) {
+      alert(
+        "Voice output isn't supported in this browser."
+      );
+
       return;
     }
 
@@ -718,32 +983,52 @@ function SpeakButton({ text }) {
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(
-      stripMarkdown(text)
-    );
+    const utterance =
+      new SpeechSynthesisUtterance(
+        stripMarkdown(text)
+      );
 
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
+    utterance.onend = () =>
+      setSpeaking(false);
+
+    utterance.onerror = () =>
+      setSpeaking(false);
 
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+
+    window.speechSynthesis.speak(
+      utterance
+    );
 
     setSpeaking(true);
   }
 
   return (
     <button
+      type="button"
       onClick={handleClick}
       className="text-[11px] text-gray-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400"
     >
-      {speaking ? "⏹ Stop" : "🔊 Listen"}
+      {speaking
+        ? "⏹ Stop"
+        : "🔊 Listen"}
     </button>
   );
 }
 
-function VoiceInputButton({ onResult, disabled }) {
-  const [listening, setListening] = useState(false);
-  const recognitionRef = useRef(null);
+// =====================================================
+// VOICE INPUT BUTTON
+// =====================================================
+
+function VoiceInputButton({
+  onResult,
+  disabled,
+}) {
+  const [listening, setListening] =
+    useState(false);
+
+  const recognitionRef =
+    useRef(null);
 
   function handleClick() {
     const SpeechRecognition =
@@ -754,6 +1039,7 @@ function VoiceInputButton({ onResult, disabled }) {
       alert(
         "Voice input isn't supported in this browser. Try Chrome or Edge."
       );
+
       return;
     }
 
@@ -762,24 +1048,33 @@ function VoiceInputButton({ onResult, disabled }) {
       return;
     }
 
-    const recognition = new SpeechRecognition();
+    const recognition =
+      new SpeechRecognition();
 
     recognition.lang = "en-US";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    recognition.onstart = () =>
+      setListening(true);
+
+    recognition.onend = () =>
+      setListening(false);
+
+    recognition.onerror = () =>
+      setListening(false);
 
     recognition.onresult = (event) => {
       const transcript =
-        event.results[0][0].transcript;
+        event.results[0][0]
+          .transcript;
 
       onResult(transcript);
     };
 
-    recognitionRef.current = recognition;
+    recognitionRef.current =
+      recognition;
+
     recognition.start();
   }
 
