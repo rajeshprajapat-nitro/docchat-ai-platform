@@ -233,5 +233,7 @@ def query(
             "Cache-Control": "no-cache",
             "X-Session-Id": session_id_value,
             "Access-Control-Expose-Headers": "X-Session-Id",
+             "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
         },
     )

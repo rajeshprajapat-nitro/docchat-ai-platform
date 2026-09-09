@@ -11,9 +11,6 @@ import { useDarkMode } from "./useDarkMode";
 export default function App() {
   const [isDark, setIsDark] = useDarkMode();
 
-  // Simple manual routing for the one public route this app needs - no
-  // router library required. /share/<token> renders a read-only view with
-  // no auth, everything else renders the normal authenticated app.
   const shareMatch = window.location.pathname.match(/^\/share\/([^/]+)/);
   if (shareMatch) {
     return <SharedChatView token={shareMatch[1]} />;
@@ -30,6 +27,7 @@ export default function App() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [activeMessages, setActiveMessages] = useState([]);
   const [pendingAsk, setPendingAsk] = useState(null);
+  const [chatKey, setChatKey] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -59,7 +57,6 @@ export default function App() {
     refreshDocuments();
     refreshSessions();
 
-    // poll documents while any are processing, so status updates live
     const interval = setInterval(() => {
       refreshDocuments();
     }, 4000);
@@ -70,11 +67,13 @@ export default function App() {
     setActiveSessionId(id);
     const msgs = await fetchMessages(id);
     setActiveMessages(msgs);
+    setChatKey((k) => k + 1);
   }
 
   function handleNewChat() {
     setActiveSessionId(null);
     setActiveMessages([]);
+    setChatKey((k) => k + 1);
   }
 
   function handleSessionCreated(id) {
@@ -127,7 +126,7 @@ export default function App() {
         onAskSuggested={(question) => setPendingAsk({ text: question, key: Date.now() })}
       />
       <ChatPanel
-        key={activeSessionId || "new"}
+        key={chatKey}
         sessionId={activeSessionId}
         setSessionId={handleSessionCreated}
         selectedDocIds={selectedDocIds}
