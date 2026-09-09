@@ -60,6 +60,7 @@ export default function ChatPanel({
         if (targetIndex >= prev.length) return prev;
 
         const updated = [...prev];
+
         updated[targetIndex] = {
           ...updated[targetIndex],
           ...patch,
@@ -109,7 +110,6 @@ export default function ChatPanel({
       },
 
       onDone: () => setStreaming(false),
-
       onError: () => setStreaming(false),
     });
   }
@@ -404,10 +404,10 @@ export default function ChatPanel({
       </div>
 
       {/* Bottom composer */}
-      <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-3 py-2 sm:p-4 shrink-0">
+      <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-3 py-2.5 sm:p-4 shrink-0">
         <form
           onSubmit={handleSend}
-          className="w-full max-w-3xl mx-auto flex gap-1.5 sm:gap-2 items-end"
+          className="w-full max-w-3xl mx-auto flex items-center gap-2"
         >
           {/* Text input */}
           <div className="flex-1 relative min-w-0">
@@ -421,7 +421,7 @@ export default function ChatPanel({
               }}
               onKeyDown={handleKeyDown}
               placeholder="Message DocChat…"
-              className="w-full resize-none border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-2xl pl-3 sm:pl-4 pr-10 sm:pr-11 py-2.5 sm:py-3 text-[14px] sm:text-[15px] focus:outline-none focus:ring-2 focus:ring-brand-500 max-h-40"
+              className="w-full resize-none border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl sm:rounded-2xl pl-3 sm:pl-4 pr-10 sm:pr-11 py-2.5 sm:py-3 text-[14px] sm:text-[15px] focus:outline-none focus:ring-2 focus:ring-brand-500 max-h-40"
             />
 
             {/* Web toggle */}
@@ -443,7 +443,7 @@ export default function ChatPanel({
             </button>
           </div>
 
-          {/* Voice */}
+          {/* Voice button */}
           <VoiceInputButton
             disabled={streaming}
             onResult={(transcript) => {
@@ -455,19 +455,19 @@ export default function ChatPanel({
             }}
           />
 
-          {/* Send / Stop */}
+          {/* Send / Stop button */}
           {streaming ? (
             <button
               type="button"
               onClick={handleStop}
-              className="bg-red-600 hover:bg-red-700 text-white px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium shrink-0"
+              className="shrink-0 h-10 sm:h-11 px-3.5 sm:px-5 bg-red-600 hover:bg-red-700 text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium flex items-center justify-center"
             >
-              ■ <span className="hidden xs:inline">Stop</span>
+              ■ <span className="hidden sm:inline ml-1">Stop</span>
             </button>
           ) : (
             <button
               type="submit"
-              className="bg-brand-600 hover:bg-brand-700 text-white px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium shrink-0"
+              className="shrink-0 h-10 sm:h-11 px-3.5 sm:px-5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-medium flex items-center justify-center"
             >
               Send
             </button>
@@ -566,7 +566,7 @@ function SpeakButton({ text }) {
   function stripMarkdown(md) {
     return md
       .replace(/\[\d+\]/g, "")
-      .replace(/[\*\_#\`>]/g, "")
+      .replace(/[\*\_\#\`>]/g, "")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/\s+/g, " ")
       .trim();
@@ -584,7 +584,9 @@ function SpeakButton({ text }) {
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(stripMarkdown(text));
+    const utterance = new SpeechSynthesisUtterance(
+      stripMarkdown(text)
+    );
 
     utterance.onend = () => setSpeaking(false);
     utterance.onerror = () => setSpeaking(false);
