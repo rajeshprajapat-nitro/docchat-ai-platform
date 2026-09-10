@@ -1,7 +1,6 @@
 import os
 import secrets
-import smtplib
-from email.message import EmailMessage
+import requests
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,27 +14,85 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 # =========================================================
-# Send Password Reset Email
+# Send Password Reset Email using Resend
 # =========================================================
 
 def send_reset_email(email: str, reset_link: str):
-    smtp_host = os.getenv("SMTP_HOST", "")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_username = os.getenv("SMTP_USERNAME", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
-    smtp_from = os.getenv("SMTP_FROM", smtp_username)
+    resend_api_key = os.getenv("RESEND_API_KEY", "")
+    resend_from = os.getenv("RESEND_FROM", "")
 
-    if not smtp_host or not smtp_username or not smtp_password:
-        raise RuntimeError("SMTP email settings are not configured")
+    if not resend_api_key or not resend_from:
+        raise RuntimeError(
+            "Resend email settings are not configured"
+        )
 
-    message = EmailMessage()
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {resend_api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": resend_from,
+            "to": [email],
+            "subject": "Reset your DocChat password",
+            "html": f"""
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #222;">
+                    <h2>Reset your DocChat password</h2>
 
-    message["Subject"] = "Reset your DocChat password"
-    message["From"] = smtp_from
-    message["To"] = email
+                    <p>Hi,</p>
 
-    message.set_content(
-        f"""Hi,
+                    <p>
+                        We received a request to reset your DocChat password.
+                    </p>
+
+                    <p>
+                        Click the button below to create a new password:
+                    </p>
+
+                    <p style="margin: 24px 0;">
+                        <a
+                            href="{reset_link}"
+                            style="
+                                display: inline-block;
+                                padding: 12px 20px;
+                                background: #4f46e5;
+                                color: white;
+                                text-decoration: none;
+                                border-radius: 8px;
+                                font-weight: 600;
+                            "
+                        >
+                            Reset Password
+                        </a>
+                    </p>
+
+                    <p>
+                        Or copy and open this link:
+                    </p>
+
+                    <p>
+                        <a href="{reset_link}">
+                            {reset_link}
+                        </a>
+                    </p>
+
+                    <p>
+                        This link will expire in 30 minutes.
+                    </p>
+
+                    <p>
+                        If you did not request a password reset,
+                        you can safely ignore this email.
+                    </p>
+
+                    <p>
+                        Regards,<br>
+                        <strong>DocChat</strong>
+                    </p>
+                </div>
+            """,
+            "text": f"""Hi,
 
 We received a request to reset your DocChat password.
 
@@ -49,13 +106,15 @@ If you did not request a password reset, you can safely ignore this email.
 
 Regards,
 DocChat
-"""
+""",
+        },
+        timeout=20,
     )
 
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_username, smtp_password)
-        server.send_message(message)
+    if not response.ok:
+        raise RuntimeError(
+            f"Resend API error {response.status_code}: {response.text}"
+        )
 
 
 # =========================================================
