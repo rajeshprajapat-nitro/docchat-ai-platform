@@ -249,11 +249,7 @@ def stream_answer(
 
     matches = retrieve(user_id, query, document_ids=document_ids)
 
-    # Smart auto web-search fallback: even if the user hasn't toggled web
-    # search on, automatically pull in live web results when the documents
-    # don't cover the question well (no matches, or weak top match) - so
-    # "summarize this PDF" stays document-only, but "how does this compare to
-    # X" automatically reaches beyond the PDF, like ChatGPT browsing would.
+    # Smart auto web-search fallback
     top_score = matches[0]["score"] if matches else 0
     should_auto_web = (not matches) or top_score < 0.45
     do_web_search = use_web_search or should_auto_web
@@ -263,7 +259,11 @@ def stream_answer(
         web_results = web_search.fetch_web_context(query)
 
     has_sources = bool(matches or web_results)
-    context_block, citations = _build_sources(matches, web_results) if has_sources else ("", [])
+    context_block, citations = (
+        _build_sources(matches, web_results)
+        if has_sources
+        else ("", [])
+    )
 
     if has_sources:
         user_content = f"Sources:\n\n{context_block}\n\nQuestion: {query}"
@@ -273,9 +273,16 @@ def stream_answer(
     history = _history_to_gemini(chat_history)
 
     def _start_stream():
-        model = genai.GenerativeModel(model_name=settings.CHAT_MODEL, system_instruction=SYSTEM_PROMPT)
+        model = genai.GenerativeModel(
+            model_name=settings.CHAT_MODEL,
+            system_instruction=SYSTEM_PROMPT,
+        )
         chat = model.start_chat(history=history)
-        return chat.send_message(user_content, stream=True, generation_config={"temperature": 0.3})
+        return chat.send_message(
+            user_content,
+            stream=True,
+            generation_config={"temperature": 0.3},
+        )
 
     full_text = ""
     last_exc = None
@@ -284,49 +291,92 @@ def stream_answer(
     for attempt in range(attempts):
         try:
             response = _start_stream()
+
             for chunk in response:
                 delta = chunk.text if chunk.text else ""
+
                 if delta:
                     full_text += delta
-                    yield f"event: token\ndata: {json.dumps({'text': delta})}\n\n"
+                    yield (
+                        f"event: token\n"
+                        f"data: {json.dumps({'text': delta})}\n\n"
+                    )
+
             last_exc = None
             break
+
         except Exception as e:
             last_exc = e
+
             if full_text:
                 # Already streamed partial content - retrying would duplicate
                 # or confuse the answer, so stop here rather than retry.
                 break
+
             if gemini_client.is_quota_error(e) and gemini_client.rotate():
                 continue
+
             break
 
+    # --------------------------------------------------
+    # AI unavailable / final error
+    # --------------------------------------------------
     if last_exc is not None and not full_text:
+
         if gemini_client.is_quota_error(last_exc):
             friendly = (
-                "⚠️ The AI model is temporarily unavailable on the configured key(s) - "
-                + ("all configured keys have hit their limit or access issue" if gemini_client.key_count() > 1 else "the free daily quota has been used up")
+                "The AI model is temporarily unavailable on the configured key(s) - "
+                + (
+                    "all configured keys have hit their limit or access issue"
+                    if gemini_client.key_count() > 1
+                    else "the free daily quota has been used up"
+                )
                 + ". Please wait a bit and try again, or add another API key."
             )
         else:
-            friendly = "⚠️ Something went wrong generating a response. Please try again."
-        full_text = friendly
-        yield f"event: token\ndata: {json.dumps({'text': friendly})}\n\n"
-        yield f"event: citations\ndata: {json.dumps(citations)}\n\n"
-        yield "event: done\ndata: {}\n\n"
+            friendly = (
+                "Something went wrong generating a response. "
+                "Please try again."
+            )
+
+        # IMPORTANT:
+        # Send this as an SSE error event, NOT as a token.
+        # This allows the frontend to show the custom retry card.
+        yield (
+            f"event: error\n"
+            f"data: {json.dumps({'message': friendly})}\n\n"
+        )
         return
 
-    yield f"event: citations\ndata: {json.dumps(citations)}\n\n"
+    # --------------------------------------------------
+    # Citations
+    # --------------------------------------------------
+    yield (
+        f"event: citations\n"
+        f"data: {json.dumps(citations)}\n\n"
+    )
 
-    # Fire "done" as soon as the visible answer is complete, so the Send
-    # button and input re-enable immediately (ChatGPT-like responsiveness).
-    # Groundedness + suggestions are best-effort extras that stream in a
-    # moment later and just patch the same message once ready.
+    # --------------------------------------------------
+    # Done
+    # --------------------------------------------------
     yield "event: done\ndata: {}\n\n"
 
-    # One combined call (on the separate lite-model quota) instead of two,
-    # to conserve the free tier's very limited per-model daily request cap.
-    extras = _generate_extras(context_block, query, full_text)
+    # --------------------------------------------------
+    # Groundedness + suggestions
+    # --------------------------------------------------
+    extras = _generate_extras(
+        context_block,
+        query,
+        full_text,
+    )
+
     if extras.get("groundedness"):
-        yield f"event: groundedness\ndata: {json.dumps(extras['groundedness'])}\n\n"
-    yield f"event: suggestions\ndata: {json.dumps(extras.get('suggestions', []))}\n\n"
+        yield (
+            f"event: groundedness\n"
+            f"data: {json.dumps(extras['groundedness'])}\n\n"
+        )
+
+    yield (
+        f"event: suggestions\n"
+        f"data: {json.dumps(extras.get('suggestions', []))}\n\n"
+    )
