@@ -46,6 +46,7 @@ class DocumentOut(BaseModel):
     def parse_key_topics(cls, v):
         if v is None or isinstance(v, list):
             return v
+
         try:
             return json.loads(v)
         except Exception:
@@ -77,6 +78,19 @@ class UserUpdate(BaseModel):
 
 class PasswordChange(BaseModel):
     current_password: str
+    new_password: str
+
+
+# =========================
+# Forgot Password
+# =========================
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
     new_password: str
 
 
