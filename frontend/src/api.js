@@ -3,12 +3,17 @@ export const API_BASE =
 
 function authHeaders() {
     const token = localStorage.getItem("token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return token ? { Authorization: `
+Bearer $ { token }
+` } : {};
 }
 
 export function getPreviewUrl(documentId) {
     const token = localStorage.getItem("token");
-    return `${API_BASE}/documents/${documentId}/file?token=${encodeURIComponent(token || "")}`;
+    return `
+$ { API_BASE }
+/documents/$ { documentId }
+/file?token=${encodeURIComponent(token || "")}`;
 }
 
 export function exportChatAsMarkdown(messages, title = "chat") {
@@ -26,257 +31,314 @@ export function exportChatAsMarkdown(messages, title = "chat") {
             m.citations.forEach((c, i) => {
                         lines.push(
                                 `${i + 1}. ${c.filename}${c.page ? ` (p.${c.page})` : ""}`
-        );
-      });
+                );
+            });
+        }
+
+        lines.push("");
     }
 
-    lines.push("");
-  }
+    const blob = new Blob([lines.join("\n")], {
+        type: "text/markdown",
+    });
 
-  const blob = new Blob([lines.join("\n")], {
-    type: "text/markdown",
-  });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+    a.href = url;
+    a.download =
+        `${title.replace(/[^a-z0-9]+/gi, "_").toLowerCase() || "chat"}.md`;
 
-  a.href = url;
-  a.download =
-    `${title.replace(/[^a-z0-9]+/gi, "_").toLowerCase() || "chat"}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-
-  URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
 }
 
 export async function fetchAnalytics() {
-  const res = await fetch(`${API_BASE}/analytics/summary`, {
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/analytics/summary`, {
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Failed to load analytics");
-  }
+    if (!res.ok) {
+        throw new Error("Failed to load analytics");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function fetchMe() {
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/auth/me`, {
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Failed to load profile");
-  }
+    if (!res.ok) {
+        throw new Error("Failed to load profile");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function updateProfile(full_name) {
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: JSON.stringify({ full_name }),
-  });
+    const res = await fetch(`${API_BASE}/auth/me`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(),
+        },
+        body: JSON.stringify({ full_name }),
+    });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Update failed");
-  }
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Update failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function changePassword(current_password, new_password) {
-  const res = await fetch(`${API_BASE}/auth/change-password`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: JSON.stringify({
-      current_password,
-      new_password,
-    }),
-  });
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(),
+        },
+        body: JSON.stringify({
+            current_password,
+            new_password,
+        }),
+    });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Password change failed");
-  }
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Password change failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function renameSession(id, title) {
-  const res = await fetch(`${API_BASE}/chat/sessions/${id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-    },
-    body: JSON.stringify({ title }),
-  });
+    const res = await fetch(`${API_BASE}/chat/sessions/${id}`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            ...authHeaders(),
+        },
+        body: JSON.stringify({ title }),
+    });
 
-  if (!res.ok) {
-    throw new Error("Rename failed");
-  }
+    if (!res.ok) {
+        throw new Error("Rename failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function deleteSession(id) {
-  const res = await fetch(`${API_BASE}/chat/sessions/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/chat/sessions/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Delete failed");
-  }
+    if (!res.ok) {
+        throw new Error("Delete failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function shareSession(id) {
-  const res = await fetch(`${API_BASE}/chat/sessions/${id}/share`, {
-    method: "POST",
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/chat/sessions/${id}/share`, {
+        method: "POST",
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Failed to create share link");
-  }
+    if (!res.ok) {
+        throw new Error("Failed to create share link");
+    }
 
-  const data = await res.json();
+    const data = await res.json();
 
-  return `${window.location.origin}/share/${data.token}`;
+    return `${window.location.origin}/share/${data.token}`;
 }
 
 export async function fetchSharedChat(token) {
-  const res = await fetch(`${API_BASE}/chat/share/${token}`);
+    const res = await fetch(`${API_BASE}/chat/share/${token}`);
 
-  if (!res.ok) {
-    throw new Error("Shared chat not found");
-  }
+    if (!res.ok) {
+        throw new Error("Shared chat not found");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function signup(email, password, full_name) {
-  const res = await fetch(`${API_BASE}/auth/signup`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-      full_name,
-    }),
-  });
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            email,
+            password,
+            full_name,
+        }),
+    });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Signup failed");
-  }
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Signup failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function login(email, password) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
-  });
+    const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            email,
+            password,
+        }),
+    });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Login failed");
-  }
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Login failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
+
+// =========================================================
+// Forgot Password
+// =========================================================
+
+export async function forgotPassword(email) {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            email,
+        }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+        throw new Error(
+            data.detail || "Unable to send password reset email"
+        );
+    }
+
+    return data;
+}
+
+
+// =========================================================
+// Reset Password
+// =========================================================
+
+export async function resetPassword(token, newPassword) {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            token,
+            new_password: newPassword,
+        }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+        throw new Error(
+            data.detail || "Unable to reset password"
+        );
+    }
+
+    return data;
+}
+
+
 export async function fetchDocuments() {
-  const res = await fetch(`${API_BASE}/documents`, {
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/documents`, {
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Failed to load documents");
-  }
+    if (!res.ok) {
+        throw new Error("Failed to load documents");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function uploadDocument(file, onProgress) {
-  const formData = new FormData();
+    const formData = new FormData();
 
-  formData.append("file", file);
+    formData.append("file", file);
 
-  const res = await fetch(`${API_BASE}/documents/upload`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: formData,
-  });
+    const res = await fetch(`${API_BASE}/documents/upload`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: formData,
+    });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Upload failed");
-  }
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Upload failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function deleteDocument(id) {
-  const res = await fetch(`${API_BASE}/documents/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/documents/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Delete failed");
-  }
+    if (!res.ok) {
+        throw new Error("Delete failed");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function fetchSessions() {
-  const res = await fetch(`${API_BASE}/chat/sessions`, {
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/chat/sessions`, {
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Failed to load sessions");
-  }
+    if (!res.ok) {
+        throw new Error("Failed to load sessions");
+    }
 
-  return res.json();
+    return res.json();
 }
 
 export async function fetchMessages(sessionId) {
-  const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}/messages`, {
-    headers: authHeaders(),
-  });
+    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}/messages`, {
+        headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error("Failed to load messages");
-  }
+    if (!res.ok) {
+        throw new Error("Failed to load messages");
+    }
 
-  return res.json();
+    return res.json();
 }
+
 
 /**
  * Streams a chat answer via SSE.
@@ -293,210 +355,224 @@ export async function fetchMessages(sessionId) {
  * Backend errors are now forwarded to onError()
  * instead of being hidden behind "Query failed".
  */
+
 export async function streamQuery({
-  sessionId,
-  message,
-  documentIds,
-  useWeb,
-  onToken,
-  onCitations,
-  onSuggestions,
-  onGroundedness,
-  onSessionId,
-  onDone,
-  onError,
-  signal,
+    sessionId,
+    message,
+    documentIds,
+    useWeb,
+    onToken,
+    onCitations,
+    onSuggestions,
+    onGroundedness,
+    onSessionId,
+    onDone,
+    onError,
+    signal,
 }) {
-  try {
-    const res = await fetch(`${API_BASE}/chat/query`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders(),
-      },
-      body: JSON.stringify({
-        session_id: sessionId,
-        message,
-        document_ids: documentIds,
-        use_web_search: !!useWeb,
-      }),
-      signal,
-    });
+    try {
+        const res = await fetch(`${API_BASE}/chat/query`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...authHeaders(),
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                message,
+                document_ids: documentIds,
+                use_web_search: !!useWeb,
+            }),
+            signal,
+        });
 
-    // -----------------------------------------
-    // Handle normal HTTP errors
-    // -----------------------------------------
-    if (!res.ok) {
-      let errorMessage = `Request failed (${res.status})`;
+        // -----------------------------------------
+        // Handle normal HTTP errors
+        // -----------------------------------------
 
-      try {
-        const errorText = await res.text();
+        if (!res.ok) {
+            let errorMessage = `Request failed (${res.status})`;
 
-        if (errorText) {
-          try {
-            const errorData = JSON.parse(errorText);
+            try {
+                const errorText = await res.text();
 
-            errorMessage =
-              errorData.detail ||
-              errorData.message ||
-              errorData.error ||
-              errorText;
-          } catch {
-            errorMessage = errorText;
-          }
+                if (errorText) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+
+                        errorMessage =
+                            errorData.detail ||
+                            errorData.message ||
+                            errorData.error ||
+                            errorText;
+                    } catch {
+                        errorMessage = errorText;
+                    }
+                }
+            } catch {
+                // Keep default error message
+            }
+
+            throw new Error(errorMessage);
         }
-      } catch {
-        // Keep default error message
-      }
 
-      throw new Error(errorMessage);
+        // -----------------------------------------
+        // Get session ID from response headers
+        // -----------------------------------------
+
+        const newSessionId = res.headers.get("X-Session-Id");
+
+        if (newSessionId && onSessionId) {
+            onSessionId(newSessionId);
+        }
+
+        // -----------------------------------------
+        // Check response body
+        // -----------------------------------------
+
+        if (!res.body) {
+            throw new Error("Empty response from server");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        let buffer = "";
+
+        // -----------------------------------------
+        // Read SSE stream
+        // -----------------------------------------
+
+        while (true) {
+            const { value, done } = await reader.read();
+
+            if (done) {
+                break;
+            }
+
+            buffer += decoder.decode(value, {
+                stream: true,
+            });
+
+            const events = buffer.split("\n\n");
+
+            // Keep incomplete SSE event
+            buffer = events.pop() || "";
+
+            for (const evt of events) {
+                if (!evt.trim()) {
+                    continue;
+                }
+
+                const eventMatch = evt.match(/^event:\s*(.+)$/m);
+                const dataMatch = evt.match(/^data:\s*(.+)$/m);
+
+                if (!eventMatch || !dataMatch) {
+                    continue;
+                }
+
+                const eventType = eventMatch[1].trim();
+
+                let data;
+
+                // -----------------------------------------
+                // Parse SSE JSON safely
+                // -----------------------------------------
+
+                try {
+                    data = JSON.parse(dataMatch[1]);
+                } catch {
+                    data = dataMatch[1];
+                }
+
+                // -----------------------------------------
+                // TOKEN
+                // -----------------------------------------
+
+                if (eventType === "token") {
+                    if (onToken) {
+                        onToken(data?.text || "");
+                    }
+                }
+
+                // -----------------------------------------
+                // CITATIONS
+                // -----------------------------------------
+
+                else if (eventType === "citations") {
+                    if (onCitations) {
+                        onCitations(data);
+                    }
+                }
+
+                // -----------------------------------------
+                // SUGGESTIONS
+                // -----------------------------------------
+
+                else if (eventType === "suggestions") {
+                    if (onSuggestions) {
+                        onSuggestions(data);
+                    }
+                }
+
+                // -----------------------------------------
+                // GROUNDEDNESS
+                // -----------------------------------------
+
+                else if (eventType === "groundedness") {
+                    if (onGroundedness) {
+                        onGroundedness(data);
+                    }
+                }
+
+                // -----------------------------------------
+                // BACKEND ERROR
+                // -----------------------------------------
+
+                else if (eventType === "error") {
+                    const errorMessage =
+                        typeof data === "string"
+                            ? data
+                            : data?.detail ||
+                              data?.message ||
+                              data?.error ||
+                              "AI service temporarily unavailable";
+
+                    throw new Error(errorMessage);
+                }
+
+                // -----------------------------------------
+                // DONE
+                // -----------------------------------------
+
+                else if (eventType === "done") {
+                    if (onDone) {
+                        onDone();
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        // -----------------------------------------
+        // User cancelled request
+        // -----------------------------------------
+
+        if (err.name === "AbortError") {
+            if (onDone) {
+                onDone();
+            }
+
+            return;
+        }
+
+        // -----------------------------------------
+        // Forward REAL backend error
+        // -----------------------------------------
+
+        console.error("[streamQuery]", err);
+
+        if (onError) {
+            onError(err);
+        }
     }
-
-    // -----------------------------------------
-    // Get session ID from response headers
-    // -----------------------------------------
-    const newSessionId = res.headers.get("X-Session-Id");
-
-    if (newSessionId && onSessionId) {
-      onSessionId(newSessionId);
-    }
-
-    // -----------------------------------------
-    // Check response body
-    // -----------------------------------------
-    if (!res.body) {
-      throw new Error("Empty response from server");
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-
-    let buffer = "";
-
-    // -----------------------------------------
-    // Read SSE stream
-    // -----------------------------------------
-    while (true) {
-      const { value, done } = await reader.read();
-
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, {
-        stream: true,
-      });
-
-      const events = buffer.split("\n\n");
-
-      // Keep incomplete SSE event
-      buffer = events.pop() || "";
-
-      for (const evt of events) {
-        if (!evt.trim()) {
-          continue;
-        }
-
-        const eventMatch = evt.match(/^event:\s*(.+)$/m);
-        const dataMatch = evt.match(/^data:\s*(.+)$/m);
-
-        if (!eventMatch || !dataMatch) {
-          continue;
-        }
-
-        const eventType = eventMatch[1].trim();
-
-        let data;
-
-        // -----------------------------------------
-        // Parse SSE JSON safely
-        // -----------------------------------------
-        try {
-          data = JSON.parse(dataMatch[1]);
-        } catch {
-          data = dataMatch[1];
-        }
-
-        // -----------------------------------------
-        // TOKEN
-        // -----------------------------------------
-        if (eventType === "token") {
-          if (onToken) {
-            onToken(data?.text || "");
-          }
-        }
-
-        // -----------------------------------------
-        // CITATIONS
-        // -----------------------------------------
-        else if (eventType === "citations") {
-          if (onCitations) {
-            onCitations(data);
-          }
-        }
-
-        // -----------------------------------------
-        // SUGGESTIONS
-        // -----------------------------------------
-        else if (eventType === "suggestions") {
-          if (onSuggestions) {
-            onSuggestions(data);
-          }
-        }
-
-        // -----------------------------------------
-        // GROUNDEDNESS
-        // -----------------------------------------
-        else if (eventType === "groundedness") {
-          if (onGroundedness) {
-            onGroundedness(data);
-          }
-        }
-
-        // -----------------------------------------
-        // BACKEND ERROR
-        // -----------------------------------------
-        else if (eventType === "error") {
-          const errorMessage =
-            typeof data === "string"
-              ? data
-              : data?.detail ||
-                data?.message ||
-                data?.error ||
-                "AI service temporarily unavailable";
-
-          throw new Error(errorMessage);
-        }
-
-        // -----------------------------------------
-        // DONE
-        // -----------------------------------------
-        else if (eventType === "done") {
-          if (onDone) {
-            onDone();
-          }
-        }
-      }
-    }
-  } catch (err) {
-    // -----------------------------------------
-    // User cancelled request
-    // -----------------------------------------
-    if (err.name === "AbortError") {
-      if (onDone) {
-        onDone();
-      }
-
-      return;
-    }
-
-    // -----------------------------------------
-    // Forward REAL backend error
-    // -----------------------------------------
-    console.error("[streamQuery]", err);
-
-    if (onError) {
-      onError(err);
-    }
-  }
 }
