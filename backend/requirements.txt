@@ -13,3 +13,4 @@ PyMuPDF==1.24.11
 requests==2.32.3
 beautifulsoup4==4.12.3
 duckduckgo-search==6.3.4
+psycopg2-binary==2.9.9
