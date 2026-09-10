@@ -1,26 +1,45 @@
 export const API_BASE =
     import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+
+/* =========================================================
+   Authentication Headers
+   ========================================================= */
+
 function authHeaders() {
     const token = localStorage.getItem("token");
-    return token ? { Authorization: `
-Bearer $ { token }
-` } : {};
+
+    return token ? {
+        Authorization: `Bearer ${token}`,
+    } : {};
 }
+
+
+/* =========================================================
+   Document Preview URL
+   ========================================================= */
 
 export function getPreviewUrl(documentId) {
     const token = localStorage.getItem("token");
-    return `
-$ { API_BASE }
-/documents/$ { documentId }
-/file?token=${encodeURIComponent(token || "")}`;
+
+    return `${API_BASE}/documents/${documentId}/file?token=${encodeURIComponent(
+        token || ""
+    )}`;
 }
+
+
+/* =========================================================
+   Export Chat as Markdown
+   ========================================================= */
 
 export function exportChatAsMarkdown(messages, title = "chat") {
     const lines = [`# ${title}`, ""];
 
     for (const m of messages) {
-        const speaker = m.role === "user" ? "**You**" : "**Assistant**";
+        const speaker =
+            m.role === "user" ?
+            "**You**" :
+            "**Assistant**";
 
         lines.push(`${speaker}: ${m.content}`);
 
@@ -30,7 +49,9 @@ export function exportChatAsMarkdown(messages, title = "chat") {
 
             m.citations.forEach((c, i) => {
                         lines.push(
-                                `${i + 1}. ${c.filename}${c.page ? ` (p.${c.page})` : ""}`
+                                `${i + 1}. ${c.filename}${
+                        c.page ? ` (p.${c.page})` : ""
+                    }`
                 );
             });
         }
@@ -38,28 +59,45 @@ export function exportChatAsMarkdown(messages, title = "chat") {
         lines.push("");
     }
 
-    const blob = new Blob([lines.join("\n")], {
-        type: "text/markdown",
-    });
+    const blob = new Blob(
+        [lines.join("\n")],
+        {
+            type: "text/markdown",
+        }
+    );
 
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement("a");
 
     a.href = url;
+
     a.download =
-        `${title.replace(/[^a-z0-9]+/gi, "_").toLowerCase() || "chat"}.md`;
+        `${title
+            .replace(/[^a-z0-9]+/gi, "_")
+            .toLowerCase() || "chat"}.md`;
 
     document.body.appendChild(a);
+
     a.click();
+
     document.body.removeChild(a);
 
     URL.revokeObjectURL(url);
 }
 
+
+/* =========================================================
+   Analytics
+   ========================================================= */
+
 export async function fetchAnalytics() {
-    const res = await fetch(`${API_BASE}/analytics/summary`, {
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/analytics/summary`,
+        {
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
         throw new Error("Failed to load analytics");
@@ -68,10 +106,18 @@ export async function fetchAnalytics() {
     return res.json();
 }
 
+
+/* =========================================================
+   Current User
+   ========================================================= */
+
 export async function fetchMe() {
-    const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/auth/me`,
+        {
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
         throw new Error("Failed to load profile");
@@ -80,54 +126,91 @@ export async function fetchMe() {
     return res.json();
 }
 
+
+/* =========================================================
+   Update Profile
+   ========================================================= */
+
 export async function updateProfile(full_name) {
-    const res = await fetch(`${API_BASE}/auth/me`, {
-        method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-            ...authHeaders(),
-        },
-        body: JSON.stringify({ full_name }),
-    });
+    const res = await fetch(
+        `${API_BASE}/auth/me`,
+        {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                ...authHeaders(),
+            },
+            body: JSON.stringify({
+                full_name,
+            }),
+        }
+    );
 
     if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Update failed");
+
+        throw new Error(
+            data.detail || "Update failed"
+        );
     }
 
     return res.json();
 }
 
-export async function changePassword(current_password, new_password) {
-    const res = await fetch(`${API_BASE}/auth/change-password`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            ...authHeaders(),
-        },
-        body: JSON.stringify({
-            current_password,
-            new_password,
-        }),
-    });
+
+/* =========================================================
+   Change Password
+   ========================================================= */
+
+export async function changePassword(
+    current_password,
+    new_password
+) {
+    const res = await fetch(
+        `${API_BASE}/auth/change-password`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...authHeaders(),
+            },
+            body: JSON.stringify({
+                current_password,
+                new_password,
+            }),
+        }
+    );
 
     if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Password change failed");
+
+        throw new Error(
+            data.detail || "Password change failed"
+        );
     }
 
     return res.json();
 }
+
+
+/* =========================================================
+   Rename Chat Session
+   ========================================================= */
 
 export async function renameSession(id, title) {
-    const res = await fetch(`${API_BASE}/chat/sessions/${id}`, {
-        method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-            ...authHeaders(),
-        },
-        body: JSON.stringify({ title }),
-    });
+    const res = await fetch(
+        `${API_BASE}/chat/sessions/${id}`,
+        {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                ...authHeaders(),
+            },
+            body: JSON.stringify({
+                title,
+            }),
+        }
+    );
 
     if (!res.ok) {
         throw new Error("Rename failed");
@@ -136,11 +219,19 @@ export async function renameSession(id, title) {
     return res.json();
 }
 
+
+/* =========================================================
+   Delete Chat Session
+   ========================================================= */
+
 export async function deleteSession(id) {
-    const res = await fetch(`${API_BASE}/chat/sessions/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/chat/sessions/${id}`,
+        {
+            method: "DELETE",
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
         throw new Error("Delete failed");
@@ -149,14 +240,24 @@ export async function deleteSession(id) {
     return res.json();
 }
 
+
+/* =========================================================
+   Share Chat Session
+   ========================================================= */
+
 export async function shareSession(id) {
-    const res = await fetch(`${API_BASE}/chat/sessions/${id}/share`, {
-        method: "POST",
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/chat/sessions/${id}/share`,
+        {
+            method: "POST",
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
-        throw new Error("Failed to create share link");
+        throw new Error(
+            "Failed to create share link"
+        );
     }
 
     const data = await res.json();
@@ -164,78 +265,120 @@ export async function shareSession(id) {
     return `${window.location.origin}/share/${data.token}`;
 }
 
+
+/* =========================================================
+   Fetch Shared Chat
+   ========================================================= */
+
 export async function fetchSharedChat(token) {
-    const res = await fetch(`${API_BASE}/chat/share/${token}`);
+    const res = await fetch(
+        `${API_BASE}/chat/share/${token}`
+    );
 
     if (!res.ok) {
-        throw new Error("Shared chat not found");
+        throw new Error(
+            "Shared chat not found"
+        );
     }
 
     return res.json();
 }
 
-export async function signup(email, password, full_name) {
-    const res = await fetch(`${API_BASE}/auth/signup`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            email,
-            password,
-            full_name,
-        }),
-    });
 
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Signup failed");
-    }
+/* =========================================================
+   Signup
+   ========================================================= */
 
-    return res.json();
-}
-
-export async function login(email, password) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            email,
-            password,
-        }),
-    });
+export async function signup(
+    email,
+    password,
+    full_name
+) {
+    const res = await fetch(
+        `${API_BASE}/auth/signup`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                email,
+                password,
+                full_name,
+            }),
+        }
+    );
 
     if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Login failed");
+
+        throw new Error(
+            data.detail || "Signup failed"
+        );
     }
 
     return res.json();
 }
 
 
-// =========================================================
-// Forgot Password
-// =========================================================
+/* =========================================================
+   Login
+   ========================================================= */
+
+export async function login(
+    email,
+    password
+) {
+    const res = await fetch(
+        `${API_BASE}/auth/login`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                email,
+                password,
+            }),
+        }
+    );
+
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+
+        throw new Error(
+            data.detail || "Login failed"
+        );
+    }
+
+    return res.json();
+}
+
+
+/* =========================================================
+   Forgot Password
+   ========================================================= */
 
 export async function forgotPassword(email) {
-    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            email,
-        }),
-    });
+    const res = await fetch(
+        `${API_BASE}/auth/forgot-password`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                email,
+            }),
+        }
+    );
 
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
         throw new Error(
-            data.detail || "Unable to send password reset email"
+            data.detail ||
+                "Unable to send password reset email"
         );
     }
 
@@ -243,70 +386,108 @@ export async function forgotPassword(email) {
 }
 
 
-// =========================================================
-// Reset Password
-// =========================================================
+/* =========================================================
+   Reset Password
+   ========================================================= */
 
-export async function resetPassword(token, newPassword) {
-    const res = await fetch(`${API_BASE}/auth/reset-password`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            token,
-            new_password: newPassword,
-        }),
-    });
+export async function resetPassword(
+    token,
+    newPassword
+) {
+    const res = await fetch(
+        `${API_BASE}/auth/reset-password`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token,
+                new_password: newPassword,
+            }),
+        }
+    );
 
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
         throw new Error(
-            data.detail || "Unable to reset password"
+            data.detail ||
+                "Unable to reset password"
         );
     }
 
     return data;
 }
 
+
+/* =========================================================
+   Fetch Documents
+   ========================================================= */
 
 export async function fetchDocuments() {
-    const res = await fetch(`${API_BASE}/documents`, {
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/documents`,
+        {
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
-        throw new Error("Failed to load documents");
+        throw new Error(
+            "Failed to load documents"
+        );
     }
 
     return res.json();
 }
 
-export async function uploadDocument(file, onProgress) {
+
+/* =========================================================
+   Upload Document
+   ========================================================= */
+
+export async function uploadDocument(
+    file,
+    onProgress
+) {
     const formData = new FormData();
 
     formData.append("file", file);
 
-    const res = await fetch(`${API_BASE}/documents/upload`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: formData,
-    });
+    const res = await fetch(
+        `${API_BASE}/documents/upload`,
+        {
+            method: "POST",
+            headers: authHeaders(),
+            body: formData,
+        }
+    );
 
     if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Upload failed");
+
+        throw new Error(
+            data.detail || "Upload failed"
+        );
     }
 
     return res.json();
 }
 
+
+/* =========================================================
+   Delete Document
+   ========================================================= */
+
 export async function deleteDocument(id) {
-    const res = await fetch(`${API_BASE}/documents/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/documents/${id}`,
+        {
+            method: "DELETE",
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
         throw new Error("Delete failed");
@@ -315,46 +496,54 @@ export async function deleteDocument(id) {
     return res.json();
 }
 
+
+/* =========================================================
+   Fetch Chat Sessions
+   ========================================================= */
+
 export async function fetchSessions() {
-    const res = await fetch(`${API_BASE}/chat/sessions`, {
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/chat/sessions`,
+        {
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
-        throw new Error("Failed to load sessions");
+        throw new Error(
+            "Failed to load sessions"
+        );
     }
 
     return res.json();
 }
+
+
+/* =========================================================
+   Fetch Chat Messages
+   ========================================================= */
 
 export async function fetchMessages(sessionId) {
-    const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}/messages`, {
-        headers: authHeaders(),
-    });
+    const res = await fetch(
+        `${API_BASE}/chat/sessions/${sessionId}/messages`,
+        {
+            headers: authHeaders(),
+        }
+    );
 
     if (!res.ok) {
-        throw new Error("Failed to load messages");
+        throw new Error(
+            "Failed to load messages"
+        );
     }
 
     return res.json();
 }
 
 
-/**
- * Streams a chat answer via SSE.
- *
- * Supports:
- * - token
- * - citations
- * - suggestions
- * - groundedness
- * - error
- * - done
- *
- * Important:
- * Backend errors are now forwarded to onError()
- * instead of being hidden behind "Query failed".
- */
+/* =========================================================
+   Stream Chat Query
+   ========================================================= */
 
 export async function streamQuery({
     sessionId,
@@ -371,34 +560,41 @@ export async function streamQuery({
     signal,
 }) {
     try {
-        const res = await fetch(`${API_BASE}/chat/query`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...authHeaders(),
-            },
-            body: JSON.stringify({
-                session_id: sessionId,
-                message,
-                document_ids: documentIds,
-                use_web_search: !!useWeb,
-            }),
-            signal,
-        });
+        const res = await fetch(
+            `${API_BASE}/chat/query`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...authHeaders(),
+                },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    message,
+                    document_ids: documentIds,
+                    use_web_search: !!useWeb,
+                }),
+                signal,
+            }
+        );
 
-        // -----------------------------------------
-        // Handle normal HTTP errors
-        // -----------------------------------------
+
+        /* =====================================================
+           HTTP Errors
+           ===================================================== */
 
         if (!res.ok) {
-            let errorMessage = `Request failed (${res.status})`;
+            let errorMessage =
+                `Request failed (${res.status})`;
 
             try {
-                const errorText = await res.text();
+                const errorText =
+                    await res.text();
 
                 if (errorText) {
                     try {
-                        const errorData = JSON.parse(errorText);
+                        const errorData =
+                            JSON.parse(errorText);
 
                         errorMessage =
                             errorData.detail ||
@@ -406,130 +602,183 @@ export async function streamQuery({
                             errorData.error ||
                             errorText;
                     } catch {
-                        errorMessage = errorText;
+                        errorMessage =
+                            errorText;
                     }
                 }
             } catch {
-                // Keep default error message
+                // Keep default error
             }
 
             throw new Error(errorMessage);
         }
 
-        // -----------------------------------------
-        // Get session ID from response headers
-        // -----------------------------------------
 
-        const newSessionId = res.headers.get("X-Session-Id");
+        /* =====================================================
+           Session ID
+           ===================================================== */
 
-        if (newSessionId && onSessionId) {
+        const newSessionId =
+            res.headers.get("X-Session-Id");
+
+        if (
+            newSessionId &&
+            onSessionId
+        ) {
             onSessionId(newSessionId);
         }
 
-        // -----------------------------------------
-        // Check response body
-        // -----------------------------------------
+
+        /* =====================================================
+           Response Body
+           ===================================================== */
 
         if (!res.body) {
-            throw new Error("Empty response from server");
+            throw new Error(
+                "Empty response from server"
+            );
         }
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
+        const reader =
+            res.body.getReader();
+
+        const decoder =
+            new TextDecoder();
 
         let buffer = "";
 
-        // -----------------------------------------
-        // Read SSE stream
-        // -----------------------------------------
+
+        /* =====================================================
+           SSE Stream
+           ===================================================== */
 
         while (true) {
-            const { value, done } = await reader.read();
+            const {
+                value,
+                done,
+            } = await reader.read();
 
             if (done) {
                 break;
             }
 
-            buffer += decoder.decode(value, {
-                stream: true,
-            });
+            buffer += decoder.decode(
+                value,
+                {
+                    stream: true,
+                }
+            );
 
-            const events = buffer.split("\n\n");
+            const events =
+                buffer.split("\n\n");
 
-            // Keep incomplete SSE event
-            buffer = events.pop() || "";
+            buffer =
+                events.pop() || "";
+
 
             for (const evt of events) {
                 if (!evt.trim()) {
                     continue;
                 }
 
-                const eventMatch = evt.match(/^event:\s*(.+)$/m);
-                const dataMatch = evt.match(/^data:\s*(.+)$/m);
+                const eventMatch =
+                    evt.match(
+                        /^event:\s*(.+)$/m
+                    );
 
-                if (!eventMatch || !dataMatch) {
+                const dataMatch =
+                    evt.match(
+                        /^data:\s*(.+)$/m
+                    );
+
+                if (
+                    !eventMatch ||
+                    !dataMatch
+                ) {
                     continue;
                 }
 
-                const eventType = eventMatch[1].trim();
+                const eventType =
+                    eventMatch[1].trim();
 
                 let data;
 
-                // -----------------------------------------
-                // Parse SSE JSON safely
-                // -----------------------------------------
+
+                /* =================================================
+                   Parse SSE JSON
+                   ================================================= */
 
                 try {
-                    data = JSON.parse(dataMatch[1]);
+                    data = JSON.parse(
+                        dataMatch[1]
+                    );
                 } catch {
-                    data = dataMatch[1];
+                    data =
+                        dataMatch[1];
                 }
 
-                // -----------------------------------------
-                // TOKEN
-                // -----------------------------------------
 
-                if (eventType === "token") {
+                /* =================================================
+                   TOKEN
+                   ================================================= */
+
+                if (
+                    eventType === "token"
+                ) {
                     if (onToken) {
-                        onToken(data?.text || "");
+                        onToken(
+                            data?.text || ""
+                        );
                     }
                 }
 
-                // -----------------------------------------
-                // CITATIONS
-                // -----------------------------------------
 
-                else if (eventType === "citations") {
+                /* =================================================
+                   CITATIONS
+                   ================================================= */
+
+                else if (
+                    eventType === "citations"
+                ) {
                     if (onCitations) {
                         onCitations(data);
                     }
                 }
 
-                // -----------------------------------------
-                // SUGGESTIONS
-                // -----------------------------------------
 
-                else if (eventType === "suggestions") {
+                /* =================================================
+                   SUGGESTIONS
+                   ================================================= */
+
+                else if (
+                    eventType === "suggestions"
+                ) {
                     if (onSuggestions) {
                         onSuggestions(data);
                     }
                 }
 
-                // -----------------------------------------
-                // GROUNDEDNESS
-                // -----------------------------------------
 
-                else if (eventType === "groundedness") {
+                /* =================================================
+                   GROUNDEDNESS
+                   ================================================= */
+
+                else if (
+                    eventType === "groundedness"
+                ) {
                     if (onGroundedness) {
                         onGroundedness(data);
                     }
                 }
 
-                // -----------------------------------------
-                // BACKEND ERROR
-                // -----------------------------------------
 
-                else if (eventType === "error") {
+                /* =================================================
+                   BACKEND ERROR
+                   ================================================= */
+
+                else if (
+                    eventType === "error"
+                ) {
                     const errorMessage =
                         typeof data === "string"
                             ? data
@@ -538,14 +787,19 @@ export async function streamQuery({
                               data?.error ||
                               "AI service temporarily unavailable";
 
-                    throw new Error(errorMessage);
+                    throw new Error(
+                        errorMessage
+                    );
                 }
 
-                // -----------------------------------------
-                // DONE
-                // -----------------------------------------
 
-                else if (eventType === "done") {
+                /* =================================================
+                   DONE
+                   ================================================= */
+
+                else if (
+                    eventType === "done"
+                ) {
                     if (onDone) {
                         onDone();
                     }
@@ -553,11 +807,14 @@ export async function streamQuery({
             }
         }
     } catch (err) {
-        // -----------------------------------------
-        // User cancelled request
-        // -----------------------------------------
 
-        if (err.name === "AbortError") {
+        /* =======================================================
+           User Cancelled Request
+           ======================================================= */
+
+        if (
+            err.name === "AbortError"
+        ) {
             if (onDone) {
                 onDone();
             }
@@ -565,11 +822,15 @@ export async function streamQuery({
             return;
         }
 
-        // -----------------------------------------
-        // Forward REAL backend error
-        // -----------------------------------------
 
-        console.error("[streamQuery]", err);
+        /* =======================================================
+           Forward Real Error
+           ======================================================= */
+
+        console.error(
+            "[streamQuery]",
+            err
+        );
 
         if (onError) {
             onError(err);
