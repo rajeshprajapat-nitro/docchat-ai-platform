@@ -1103,6 +1103,8 @@ return (
     className={`w-10 h-10 sm:w-11 sm:h-11 shrink-0
       rounded-xl sm:rounded-2xl
       border flex items-center justify-center
+      overflow-hidden
+      p-0
       transition-all duration-200
       disabled:opacity-40
       ${
@@ -1119,11 +1121,12 @@ return (
           : "/microphone-icon.png"
       }
       alt={listening ? "Listening" : "Voice input"}
-      className={`w-8 h-8 sm:w-9 sm:h-9 object-contain
+      className={`w-full h-full object-cover block
         transition-transform duration-200
-        ${listening ? "scale-110" : ""}
+        scale-[1.15]
+        ${listening ? "scale-[1.25]" : ""}
       `}
     />
   </button>
-  );
+);
 }
