@@ -290,7 +290,7 @@ function AuthenticatedApp() {
     Mobile Top Bar
     ===================================================== */}
 
-<div className="md:hidden flex items-center px-3 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+<div className="md:hidden flex items-center px-2 py-1 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
 
   {/* Chat History */}
   <button
