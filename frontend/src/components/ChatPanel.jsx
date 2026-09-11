@@ -1089,24 +1089,40 @@ function VoiceInputButton({
 
     recognition.start();
   }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={disabled}
-      title={
-        listening
-          ? "Listening… click to stop"
-          : "Voice input"
-      }
-      className={`w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-xl sm:rounded-2xl border flex items-center justify-center text-base sm:text-lg transition disabled:opacity-40 ${
+  
+return (
+  <button
+    type="button"
+    onClick={handleClick}
+    disabled={disabled}
+    title={
+      listening
+        ? "Listening… click to stop"
+        : "Voice input"
+    }
+    className={`w-10 h-10 sm:w-11 sm:h-11 shrink-0
+      rounded-xl sm:rounded-2xl
+      border flex items-center justify-center
+      transition-all duration-200
+      disabled:opacity-40
+      ${
         listening
           ? "bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-700 animate-pulse"
-          : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-brand-400"
-      }`}
-    >
-      {listening ? "🔴" : "🎤"}
-    </button>
-  );
-}
+          : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-brand-400 hover:scale-105"
+      }
+    `}
+  >
+    <img
+      src={
+        listening
+          ? "/microphone-listening.png"
+          : "/microphone-icon.png"
+      }
+      alt={listening ? "Listening" : "Voice input"}
+      className={`w-8 h-8 sm:w-9 sm:h-9 object-contain
+        transition-transform duration-200
+        ${listening ? "scale-110" : ""}
+      `}
+    />
+  </button>
+);
