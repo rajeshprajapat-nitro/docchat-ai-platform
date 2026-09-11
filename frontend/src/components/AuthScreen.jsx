@@ -74,7 +74,7 @@ export default function AuthScreen({ onAuthenticated }) {
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8">
 
       {/* Header */}
-<div className="flex flex-col items-center mb-2">
+<div className="flex flex-col items-center mb-1">
   <img
     src="/logo-full.png"
     alt="DocChat"
