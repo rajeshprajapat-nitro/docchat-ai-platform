@@ -571,13 +571,13 @@ export default function ChatPanel({
   <img
     src="/user-icon.png"
     alt="User"
-    className="w-7 h-7 rounded-full object-contain"
+   className="w-full h-full object-cover scale-[1.35]"
   />
 ) : (
   <img
     src="/logo-icon.png"
     alt="AI"
-    className="w-7 h-7 rounded-full object-contain"
+     className="w-full h-full object-cover scale-[1.35]"
   />
 )}
                 </div>
