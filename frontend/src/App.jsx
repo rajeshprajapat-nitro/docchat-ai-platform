@@ -286,38 +286,46 @@ function AuthenticatedApp() {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
 
-      {/* =====================================================
-          Mobile Top Bar
-          ===================================================== */}
+     {/* =====================================================
+    Mobile Top Bar
+    ===================================================== */}
 
-      <div className="md:hidden flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+<div className="md:hidden flex items-center px-3 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
 
-        {/* Chat History */}
-        <button
-          onClick={() => setMobileSessionsOpen(true)}
-          className="p-2 text-gray-600 dark:text-gray-300"
-          aria-label="Open chat history"
-        >
-          ☰
-        </button>
+  {/* Chat History */}
+  <button
+    onClick={() => setMobileSessionsOpen(true)}
+    className="p-2 text-gray-600 dark:text-gray-300"
+    aria-label="Open chat history"
+  >
+    ☰
+  </button>
 
+  {/* Logo */}
+  <div className="flex-1 flex justify-center">
+    <img
+      src="/logo-full.png"
+      alt="DocChat AI"
+      className="h-9 w-auto object-contain dark:hidden"
+    />
 
-        {/* Logo */}
-        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-          DocChat
-        </span>
+    <img
+      src="/logo-full-dark.png"
+      alt="DocChat AI"
+      className="h-9 w-auto object-contain hidden dark:block"
+    />
+  </div>
 
+  {/* Documents */}
+  <button
+    onClick={() => setMobileDocsOpen(true)}
+    className="p-2 text-gray-600 dark:text-gray-300"
+    aria-label="Open documents"
+  >
+    📄
+  </button>
 
-        {/* Documents */}
-        <button
-          onClick={() => setMobileDocsOpen(true)}
-          className="p-2 text-gray-600 dark:text-gray-300"
-          aria-label="Open documents"
-        >
-          📄
-        </button>
-
-      </div>
+</div>
 
 
       {/* =====================================================
