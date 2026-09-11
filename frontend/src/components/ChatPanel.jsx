@@ -567,7 +567,19 @@ export default function ChatPanel({
                       : "bg-brand-600 text-white"
                   }`}
                 >
-                  {isUser ? "🧑" : "🤖"}
+ {isUser ? (
+  <img
+    src="/user-icon.png"
+    alt="User"
+    className="w-7 h-7 rounded-full object-contain"
+  />
+) : (
+  <img
+    src="/logo-icon.png"
+    alt="AI"
+    className="w-7 h-7 rounded-full object-contain"
+  />
+)}
                 </div>
 
                 {/* Message content */}
