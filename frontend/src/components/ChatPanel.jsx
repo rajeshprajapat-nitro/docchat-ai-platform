@@ -1089,7 +1089,7 @@ function VoiceInputButton({
 
     recognition.start();
   }
-  
+
 return (
   <button
     type="button"
@@ -1125,4 +1125,5 @@ return (
       `}
     />
   </button>
-);
+  );
+}
