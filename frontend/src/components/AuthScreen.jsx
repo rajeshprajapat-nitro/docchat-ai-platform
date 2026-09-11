@@ -73,14 +73,20 @@ export default function AuthScreen({ onAuthenticated }) {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white dark:from-gray-950 dark:to-gray-900 px-4">
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8">
 
-        {/* Header */}
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-          DocChat
-        </h1>
+      {/* Header */}
+<div className="flex flex-col items-center mb-6">
+  <img
+    src="/logo-full.png"
+    alt="DocChat"
+    className="h-12 w-auto object-contain dark:hidden"
+  />
 
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-          AI-powered document Q&A platform
-        </p>
+  <img
+    src="/logo-full-dark.png"
+    alt="DocChat"
+    className="h-12 w-auto object-contain hidden dark:block"
+  />
+</div>
 
         {/* Login / Signup Tabs */}
         {mode !== "forgot" && (
