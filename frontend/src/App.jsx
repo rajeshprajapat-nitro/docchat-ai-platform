@@ -306,13 +306,13 @@ function AuthenticatedApp() {
     <img
       src="/logo-full.png"
       alt="DocChat AI"
-      className="h-9 w-auto object-contain dark:hidden"
+      className="h-20 w-auto object-contain dark:hidden"
     />
 
     <img
       src="/logo-full-dark.png"
       alt="DocChat AI"
-      className="h-9 w-auto object-contain hidden dark:block"
+      className="h-20 w-auto object-contain hidden dark:block"
     />
   </div>
 

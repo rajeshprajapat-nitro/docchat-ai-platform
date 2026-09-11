@@ -78,13 +78,13 @@ export default function AuthScreen({ onAuthenticated }) {
   <img
     src="/logo-full.png"
     alt="DocChat"
-    className="h-12 w-auto object-contain dark:hidden"
+    className="h-24 w-auto object-contain dark:hidden"
   />
 
   <img
     src="/logo-full-dark.png"
     alt="DocChat"
-    className="h-12 w-auto object-contain hidden dark:block"
+    className="h-24 w-auto object-contain hidden dark:block"
   />
 </div>
 
