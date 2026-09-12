@@ -142,77 +142,140 @@ export default function ChatPanel({
     setRetryCountdown(45);
   }
 
-  // -----------------------------------------
-  // Detect image-generation requests
-  // -----------------------------------------
+ // -----------------------------------------
+// Detect image-generation requests
+// -----------------------------------------
 
-  function isImageGenerationRequest(text) {
-    const lower = text
-      .toLowerCase()
-      .trim();
+function isImageGenerationRequest(text) {
+  const lower = (text || "")
+    .toLowerCase()
+    .trim();
 
-    if (!lower) {
-      return false;
-    }
-
-    const patterns = [
-      // English
-      "generate an image",
-      "generate image",
-      "create an image",
-      "create image",
-      "make an image",
-      "make image",
-      "draw an image",
-      "draw image",
-      "generate a picture",
-      "generate picture",
-      "create a picture",
-      "create picture",
-      "make a picture",
-      "make picture",
-      "draw a picture",
-      "draw picture",
-      "generate artwork",
-      "generate art",
-      "create artwork",
-      "create art",
-      "make artwork",
-      "make art",
-      "design an image",
-      "design image",
-      "visualize",
-      "illustrate",
-      "illustration of",
-      "image of",
-      "picture of",
-
-      // Hinglish / Hindi
-      "image banao",
-      "image bana",
-      "photo banao",
-      "photo bana",
-      "picture banao",
-      "picture bana",
-      "tasveer banao",
-      "tasveer bana",
-      "chitra banao",
-      "chitra bana",
-      "ek image banao",
-      "ek photo banao",
-      "ek picture banao",
-      "image generate karo",
-      "image generate kar",
-      "image create karo",
-      "image create kar",
-      "photo generate karo",
-      "photo generate kar",
-    ];
-
-    return patterns.some((pattern) =>
-      lower.includes(pattern)
-    );
+  if (!lower) {
+    return false;
   }
+
+  const patterns = [
+    // English
+    "generate an image",
+    "generate image",
+    "generate a picture",
+    "generate picture",
+    "generate photo",
+    "generate artwork",
+    "generate art",
+
+    "create an image",
+    "create image",
+    "create a picture",
+    "create picture",
+    "create photo",
+    "create artwork",
+    "create art",
+
+    "make an image",
+    "make image",
+    "make a picture",
+    "make picture",
+    "make photo",
+    "make artwork",
+    "make art",
+
+    "draw an image",
+    "draw image",
+    "draw a picture",
+    "draw picture",
+
+    "design an image",
+    "design image",
+    "visualize",
+    "illustrate",
+    "illustration of",
+    "image of",
+    "picture of",
+    "photo of",
+
+    // Hinglish / Hindi
+    "image banao",
+    "image bana",
+    "image bana do",
+    "image bnado",
+
+    "photo banao",
+    "photo bana",
+    "photo bana do",
+
+    "picture banao",
+    "picture bana",
+    "picture bana do",
+
+    "tasveer banao",
+    "tasveer bana",
+
+    "chitra banao",
+    "chitra bana",
+
+    "image generate karo",
+    "image generate kro",
+    "image generate kar",
+    "image genrate karo",
+    "image genrate kro",
+    "image genrate kar",
+
+    "image create karo",
+    "image create kro",
+    "image create kar",
+
+    "photo generate karo",
+    "photo generate kro",
+    "photo genrate karo",
+    "photo genrate kro",
+
+    // AI image phrases
+    "ai image",
+    "ai photo",
+    "ai picture",
+    "ai art",
+    "ai image banao",
+    "ai image bana",
+    "ai image generate",
+    "ai image genrate",
+    "ai image create",
+
+    // Common Hindi requests
+    "ek image banao",
+    "ek image bana",
+    "ek photo banao",
+    "ek photo bana",
+    "ek picture banao",
+    "ek picture bana",
+    "ek ai image",
+    "ek ai photo",
+  ];
+
+  // Direct phrase matching
+  if (
+    patterns.some((pattern) =>
+      lower.includes(pattern)
+    )
+  ) {
+    return true;
+  }
+
+  // Flexible fallback:
+  // image/photo/picture + generate/create/make/draw/banao
+  const hasImageWord =
+    /\b(image|photo|picture|pic|tasveer|chitra|artwork|art)\b/.test(
+      lower
+    );
+
+  const hasGenerateWord =
+    /\b(generate|genrate|create|make|draw|design|banao|bana|bnado|illustrate)\b/.test(
+      lower
+    );
+
+  return hasImageWord && hasGenerateWord;
+}
 
   // -----------------------------------------
   // Build image URL
