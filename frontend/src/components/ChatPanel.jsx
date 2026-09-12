@@ -349,32 +349,30 @@ function isImageGenerationRequest(text) {
 
         return updated;
       });
-    } catch (error) {
-      console.error(
-        "[DocChat] Image generation error:",
-        error
-      );
+    } 
+     catch (error) {
+  console.error("[DocChat] Image generation error:", error);
 
-      setMessages((prev) => {
-        if (targetIndex >= prev.length) {
-          return prev;
-        }
+  setMessages((prev) => {
+    if (targetIndex >= prev.length) {
+      return prev;
+    }
 
-        const updated = [...prev];
+    const updated = [...prev];
 
-        updated[targetIndex] = {
-          ...updated[targetIndex],
-          role: "assistant",
-          content:
-            "Sorry, I couldn't generate that image right now. Please try again.",
-          isImage: true,
-          imageError: true,
-          citations: [],
-          suggestions: [],
-        };
+    updated[targetIndex] = {
+      ...updated[targetIndex],
+      role: "assistant",
+      content:
+        `Image generation failed: ${error?.message || "Unknown error"}`,
+      isImage: true,
+      imageError: true,
+      citations: [],
+      suggestions: [],
+    };
 
-        return updated;
-      });
+    return updated;
+  });
     } finally {
       setStreaming(false);
       abortRef.current = null;
