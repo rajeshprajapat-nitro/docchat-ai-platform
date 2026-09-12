@@ -1,5 +1,6 @@
 import base64
 import os
+import traceback
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,6 +25,7 @@ router = APIRouter(
 
 class ImageGenerationRequest(BaseModel):
     prompt: str
+    session_id: str | None = None
 
 
 # =========================================================
@@ -38,7 +40,9 @@ def _get_openai_client():
         )
 
     return OpenAI(
-        api_key=settings.OPENAI_API_KEY
+        api_key=settings.OPENAI_API_KEY,
+        timeout=120.0,
+        max_retries=2,
     )
 
 
@@ -69,6 +73,15 @@ def generate_image(
 
     client = _get_openai_client()
 
+    print(
+        f"[Image] Generating image for user "
+        f"{current_user.id}"
+    )
+
+    print(
+        f"[Image] Model: {settings.IMAGE_MODEL}"
+    )
+
     try:
         result = client.images.generate(
             model=settings.IMAGE_MODEL,
@@ -77,17 +90,23 @@ def generate_image(
 
     except Exception as exc:
         print(
-            "Image generation error:",
+            "[Image] OpenAI generation failed:",
             repr(exc),
         )
+
+        traceback.print_exc()
 
         raise HTTPException(
             status_code=500,
             detail=(
-                "Unable to generate the image right now. "
-                "Please try again."
+                "OpenAI image generation failed. "
+                "Check Render logs for the exact error."
             ),
         )
+
+    # =====================================================
+    # CHECK RESPONSE
+    # =====================================================
 
     if not result.data:
         raise HTTPException(
@@ -106,26 +125,40 @@ def generate_image(
     if not b64_json:
         raise HTTPException(
             status_code=500,
-            detail="Image generation returned no image data.",
+            detail=(
+                "Image generation returned "
+                "no base64 image data."
+            ),
         )
+
+    # =====================================================
+    # DECODE IMAGE
+    # =====================================================
 
     try:
         image_bytes = base64.b64decode(
             b64_json
         )
-    except Exception:
-        raise HTTPException(
-            status_code=500,
-            detail="Invalid image data returned by image service.",
+
+    except Exception as exc:
+        print(
+            "[Image] Base64 decode failed:",
+            repr(exc),
         )
 
-    # -----------------------------------------------------
-    # SAVE GENERATED IMAGE
-    # -----------------------------------------------------
+        raise HTTPException(
+            status_code=500,
+            detail="Invalid image data returned by OpenAI.",
+        )
+
+    # =====================================================
+    # SAVE IMAGE
+    # =====================================================
 
     generated_dir = os.path.join(
         settings.UPLOAD_DIR,
         "generated",
+        str(current_user.id),
     )
 
     os.makedirs(
@@ -134,7 +167,6 @@ def generate_image(
     )
 
     filename = (
-        f"{current_user.id}_"
         f"{uuid.uuid4().hex}.png"
     )
 
@@ -143,24 +175,43 @@ def generate_image(
         filename,
     )
 
-    with open(
-        file_path,
-        "wb",
-    ) as image_file:
-        image_file.write(image_bytes)
+    try:
+        with open(
+            file_path,
+            "wb",
+        ) as image_file:
+            image_file.write(image_bytes)
 
-    # -----------------------------------------------------
-    # RETURN PUBLIC CHAT URL
-    # -----------------------------------------------------
+    except Exception as exc:
+        print(
+            "[Image] File save failed:",
+            repr(exc),
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to save generated image.",
+        )
+
+    # =====================================================
+    # IMAGE URL
+    # =====================================================
 
     image_url = (
-        f"/images/generated/{filename}"
+        f"/images/generated/"
+        f"{current_user.id}/"
+        f"{filename}"
+    )
+
+    print(
+        f"[Image] Image saved: {file_path}"
     )
 
     return {
         "success": True,
         "image_url": image_url,
         "prompt": prompt,
+        "session_id": payload.session_id,
     }
 
 
@@ -168,25 +219,56 @@ def generate_image(
 # SERVE GENERATED IMAGE
 # =========================================================
 
-@router.get("/generated/{filename}")
+@router.get(
+    "/generated/{user_id}/{filename}"
+)
 def get_generated_image(
+    user_id: int,
     filename: str,
+    current_user: models.User = Depends(
+        auth.get_current_user
+    ),
 ):
-    generated_dir = os.path.abspath(
-        os.path.join(
-            settings.UPLOAD_DIR,
-            "generated",
+    # -----------------------------------------------------
+    # Security: user can only access own images
+    # -----------------------------------------------------
+
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have access to this image.",
         )
-    )
 
     safe_filename = os.path.basename(
         filename
     )
 
-    file_path = os.path.join(
-        generated_dir,
-        safe_filename,
+    generated_dir = os.path.abspath(
+        os.path.join(
+            settings.UPLOAD_DIR,
+            "generated",
+            str(current_user.id),
+        )
     )
+
+    file_path = os.path.abspath(
+        os.path.join(
+            generated_dir,
+            safe_filename,
+        )
+    )
+
+    # -----------------------------------------------------
+    # Path traversal protection
+    # -----------------------------------------------------
+
+    if not file_path.startswith(
+        generated_dir + os.sep
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid image path.",
+        )
 
     if not os.path.isfile(file_path):
         raise HTTPException(
@@ -197,4 +279,5 @@ def get_generated_image(
     return FileResponse(
         file_path,
         media_type="image/png",
+        filename=safe_filename,
     )
