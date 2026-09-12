@@ -3,12 +3,83 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 import {
+  API_BASE,
   streamQuery,
   shareSession,
   generateImage,
+  fetchGeneratedImage,
 } from "../api";
 
 import Citations from "./Citations";
+
+function GeneratedImage({
+  imageUrl,
+  prompt,
+}) {
+  const [src, setSrc] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let objectUrl = null;
+
+    async function loadImage() {
+      try {
+        setError("");
+        setSrc("");
+
+        const url = await fetchGeneratedImage(imageUrl);
+
+        objectUrl = url;
+        setSrc(url);
+      } catch (err) {
+        console.error(
+          "[DocChat] Generated image load error:",
+          err
+        );
+
+        setError(
+          err?.message ||
+          "Unable to load image."
+        );
+      }
+    }
+
+    if (imageUrl) {
+      loadImage();
+    }
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [imageUrl]);
+
+  if (error) {
+    return (
+      <div className="my-3 rounded-2xl border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-500/10 p-4 text-sm text-red-600 dark:text-red-400">
+        {error}
+      </div>
+    );
+  }
+
+  if (!src) {
+    return (
+      <div className="my-3 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 text-sm text-gray-500">
+        Loading image…
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={prompt || "Generated image"}
+      loading="lazy"
+      className="max-w-full h-auto rounded-2xl border border-white/10 shadow-lg"
+    />
+  );
+}
 
 export default function ChatPanel({
   sessionId,
@@ -147,134 +218,135 @@ export default function ChatPanel({
 // -----------------------------------------
 
 function isImageGenerationRequest(text) {
-  const lower = (text || "")
-    .toLowerCase()
-    .trim();
+    const lower = (text || "")
+        .toLowerCase()
+        .trim();
 
-  if (!lower) {
-    return false;
-  }
+    if (!lower) {
+        return false;
+    }
 
-  const patterns = [
-    // English
-    "generate an image",
-    "generate image",
-    "generate a picture",
-    "generate picture",
-    "generate photo",
-    "generate artwork",
-    "generate art",
+    const patterns = [
+        "generate an image",
+        "generate image",
+        "generate a picture",
+        "generate picture",
+        "generate photo",
+        "generate artwork",
+        "generate art",
 
-    "create an image",
-    "create image",
-    "create a picture",
-    "create picture",
-    "create photo",
-    "create artwork",
-    "create art",
+        "create an image",
+        "create image",
+        "create a picture",
+        "create picture",
+        "create photo",
+        "create artwork",
+        "create art",
 
-    "make an image",
-    "make image",
-    "make a picture",
-    "make picture",
-    "make photo",
-    "make artwork",
-    "make art",
+        "make an image",
+        "make image",
+        "make a picture",
+        "make picture",
+        "make photo",
+        "make artwork",
+        "make art",
 
-    "draw an image",
-    "draw image",
-    "draw a picture",
-    "draw picture",
+        "draw an image",
+        "draw image",
+        "draw a picture",
+        "draw picture",
 
-    "design an image",
-    "design image",
-    "visualize",
-    "illustrate",
-    "illustration of",
-    "image of",
-    "picture of",
-    "photo of",
+        "design an image",
+        "design image",
 
-    // Hinglish / Hindi
-    "image banao",
-    "image bana",
-    "image bana do",
-    "image bnado",
+        "visualize",
+        "illustrate",
+        "illustration of",
 
-    "photo banao",
-    "photo bana",
-    "photo bana do",
+        "image of",
+        "picture of",
+        "photo of",
 
-    "picture banao",
-    "picture bana",
-    "picture bana do",
+        // Hindi / Hinglish
+        "image banao",
+        "image bana",
+        "image bana do",
+        "image bnado",
 
-    "tasveer banao",
-    "tasveer bana",
+        "photo banao",
+        "photo bana",
+        "photo bana do",
 
-    "chitra banao",
-    "chitra bana",
+        "picture banao",
+        "picture bana",
+        "picture bana do",
 
-    "image generate karo",
-    "image generate kro",
-    "image generate kar",
-    "image genrate karo",
-    "image genrate kro",
-    "image genrate kar",
+        "tasveer banao",
+        "tasveer bana",
 
-    "image create karo",
-    "image create kro",
-    "image create kar",
+        "chitra banao",
+        "chitra bana",
 
-    "photo generate karo",
-    "photo generate kro",
-    "photo genrate karo",
-    "photo genrate kro",
+        "image generate karo",
+        "image generate kro",
+        "image generate kar",
 
-    // AI image phrases
-    "ai image",
-    "ai photo",
-    "ai picture",
-    "ai art",
-    "ai image banao",
-    "ai image bana",
-    "ai image generate",
-    "ai image genrate",
-    "ai image create",
+        "image genrate karo",
+        "image genrate kro",
+        "image genrate kar",
 
-    // Common Hindi requests
-    "ek image banao",
-    "ek image bana",
-    "ek photo banao",
-    "ek photo bana",
-    "ek picture banao",
-    "ek picture bana",
-    "ek ai image",
-    "ek ai photo",
-  ];
+        "image create karo",
+        "image create kro",
+        "image create kar",
 
-  // Direct phrase matching
-  if (
-    patterns.some((pattern) =>
-      lower.includes(pattern)
-    )
-  ) {
-    return true;
-  }
+        "photo generate karo",
+        "photo generate kro",
 
-  // Flexible fallback:
-  // image/photo/picture + generate/create/make/draw/banao
-  const hasImageWord =
-    /\b(image|photo|picture|pic|tasveer|chitra|artwork|art)\b/.test(
-      lower
+        "photo genrate karo",
+        "photo genrate kro",
+
+        "ai image",
+        "ai photo",
+        "ai picture",
+        "ai art",
+
+        "ai image banao",
+        "ai image bana",
+        "ai image generate",
+        "ai image genrate",
+        "ai image create",
+
+        "ek image banao",
+        "ek image bana",
+        "ek photo banao",
+        "ek photo bana",
+        "ek picture banao",
+        "ek picture bana",
+    ];
+
+    if (
+        patterns.some(
+            (pattern) =>
+                lower.includes(pattern)
+        )
+    ) {
+        return true;
+    }
+
+    const hasImageWord =
+        /\b(image|photo|picture|pic|tasveer|chitra|artwork|art)\b/.test(
+            lower
+        );
+
+    const hasGenerateWord =
+        /\b(generate|genrate|create|make|draw|design|banao|bana|bnado|illustrate)\b/.test(
+            lower
+        );
+
+    return (
+        hasImageWord &&
+        hasGenerateWord
     );
-
-  const hasGenerateWord =
-    /\b(generate|genrate|create|make|draw|design|banao|bana|bnado|illustrate)\b/.test(
-      lower
-    );
-
-  return hasImageWord && hasGenerateWord;
 }
 
   // -----------------------------------------
@@ -282,28 +354,28 @@ function isImageGenerationRequest(text) {
   // -----------------------------------------
 
   function buildImageUrl(imageUrl) {
-    if (!imageUrl) {
-      return "";
-    }
-
-    // Already an absolute URL
-    if (
-      imageUrl.startsWith("http://") ||
-      imageUrl.startsWith("https://") ||
-      imageUrl.startsWith("data:")
-    ) {
-      return imageUrl;
-    }
-
-    const apiBase =
-      import.meta.env.VITE_API_BASE ||
-      "http://localhost:8000";
-
-    return `${apiBase.replace(/\/$/, "")}/${imageUrl.replace(
-      /^\//,
-      ""
-    )}`;
+  if (!imageUrl) {
+    return "";
   }
+
+  // Already an absolute URL or data URL
+  if (
+    imageUrl.startsWith("http://") ||
+    imageUrl.startsWith("https://") ||
+    imageUrl.startsWith("data:")
+  ) {
+    return imageUrl;
+  }
+
+  const apiBase =
+    import.meta.env.VITE_API_BASE ||
+    "http://localhost:8000";
+
+  return `${apiBase.replace(/\/$/, "")}/${imageUrl.replace(
+    /^\//,
+    ""
+  )}`;
+}
 
   // -----------------------------------------
   // Generate image
@@ -317,7 +389,10 @@ function isImageGenerationRequest(text) {
     hideAIUnavailable();
 
     try {
-      const result = await generateImage(userText);
+      const result = await generateImage(
+  userText,
+  sessionId
+);
 
       const imageUrl = buildImageUrl(
         result?.image_url
@@ -984,26 +1059,33 @@ function isImageGenerationRequest(text) {
                           : ""
                       }`}
                     >
-                      <ReactMarkdown
-                        components={{
-                          img: ({
-                            node,
-                            ...props
-                          }) => (
-                            <img
-                              {...props}
-                              alt={
-                                props.alt ||
-                                "Generated image"
-                              }
-                              loading="lazy"
-                              className="max-w-full h-auto rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm my-3 block"
-                            />
-                          ),
-                        }}
-                      >
-                        {m.content || "…"}
-                      </ReactMarkdown>
+                      {m.isImage && m.imageUrl ? (
+                        <GeneratedImage
+                          imageUrl={m.imageUrl}
+                          prompt={m.imagePrompt}
+                        />
+                      ) : (
+                        <ReactMarkdown
+                          components={{
+                            img: ({
+                              node,
+                              ...props
+                            }) => (
+                              <img
+                                {...props}
+                                alt={
+                                  props.alt ||
+                                  "Image"
+                                }
+                                loading="lazy"
+                                className="max-w-full h-auto rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm my-3 block"
+                              />
+                            ),
+                          }}
+                        >
+                          {m.content || "…"}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   )}
 

@@ -24,23 +24,72 @@ class ImageGenerationRequest(BaseModel):
     session_id: str | None = None
 
 
-def _get_openai_client():
-    # IMPORTANT:
-    # Render environment variable mein accidental
-    # space/newline ho to strip() remove karega.
-    api_key = (settings.OPENAI_API_KEY or "").strip()
+# -----------------------------------------
+# Gemini API keys
+# -----------------------------------------
 
-    if not api_key:
+
+def _get_gemini_api_keys():
+    keys = []
+
+    # First use GOOGLE_API_KEYS
+    if settings.GOOGLE_API_KEYS:
+        keys.extend(
+            [
+                key.strip()
+                for key in settings.GOOGLE_API_KEYS.split(",")
+                if key.strip()
+            ]
+        )
+
+    # Fallback to GOOGLE_API_KEY
+    if (
+        not keys
+        and settings.GOOGLE_API_KEY
+    ):
+        key = settings.GOOGLE_API_KEY.strip()
+
+        if key:
+            keys.append(key)
+
+    return keys
+
+
+# -----------------------------------------
+# Gemini OpenAI-compatible client
+# -----------------------------------------
+
+
+def _get_gemini_client():
+    keys = _get_gemini_api_keys()
+
+    if not keys:
         raise HTTPException(
             status_code=500,
-            detail="OpenAI API key is not configured.",
+            detail=(
+                "Gemini API key is not configured."
+            ),
         )
+
+    # Use first available key.
+    # Your existing GOOGLE_API_KEYS can contain
+    # multiple comma-separated keys.
+    api_key = keys[0].strip()
 
     return OpenAI(
         api_key=api_key,
+        base_url=(
+            "https://generativelanguage.googleapis.com/"
+            "v1beta/openai/"
+        ),
         timeout=120.0,
-        max_retries=2,
+        max_retries=1,
     )
+
+
+# -----------------------------------------
+# Generate image
+# -----------------------------------------
 
 
 @router.post("/generate")
@@ -50,77 +99,111 @@ def generate_image(
         auth.get_current_user
     ),
 ):
-    prompt = (payload.prompt or "").strip()
+    prompt = (
+        payload.prompt or ""
+    ).strip()
 
     if not prompt:
         raise HTTPException(
             status_code=400,
-            detail="Image prompt cannot be empty.",
+            detail=(
+                "Image prompt cannot be empty."
+            ),
         )
 
     if len(prompt) > 4000:
         raise HTTPException(
             status_code=400,
-            detail="Image prompt is too long.",
+            detail=(
+                "Image prompt is too long."
+            ),
         )
 
     print(
-        f"[Image] Generating image for user "
-        f"{current_user.id}"
+        "[Image] Starting Gemini image generation"
+    )
+
+    print(
+        f"[Image] User: {current_user.id}"
     )
 
     print(
         f"[Image] Model: "
-        f"{settings.IMAGE_MODEL}"
+        f"{settings.GEMINI_IMAGE_MODEL}"
     )
 
-    # Never print the actual API key.
-    api_key = (settings.OPENAI_API_KEY or "").strip()
+    keys = _get_gemini_api_keys()
 
     print(
-        f"[Image] OpenAI API key configured: "
-        f"{bool(api_key)}"
+        f"[Image] Gemini API keys available: "
+        f"{len(keys)}"
     )
 
-    print(
-        f"[Image] OpenAI API key length: "
-        f"{len(api_key)}"
-    )
-
-    client = _get_openai_client()
+    if not keys:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Gemini API key is not configured."
+            ),
+        )
 
     try:
-        result = client.images.generate(
-            model=settings.IMAGE_MODEL,
+        client = _get_gemini_client()
+
+        response = client.images.generate(
+            model=settings.GEMINI_IMAGE_MODEL,
             prompt=prompt,
+            n=1,
+            response_format="b64_json",
         )
 
     except Exception as exc:
         print(
-            "[Image] OpenAI generation failed:",
+            "[Image] Gemini generation failed:",
             repr(exc),
         )
 
         traceback.print_exc()
 
+        error_text = str(exc)
+
+        # Friendly quota error
+        if (
+            "429" in error_text
+            or "quota" in error_text.lower()
+            or "resource exhausted"
+            in error_text.lower()
+        ):
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Gemini image generation quota "
+                    "is currently unavailable. "
+                    "Please try again later."
+                ),
+            )
+
         raise HTTPException(
             status_code=500,
             detail=(
-                "Unable to generate the image right now. "
-                "Please try again."
+                "Unable to generate the image "
+                "right now. Please try again."
             ),
         )
 
-    if not result.data:
+    # -----------------------------------------
+    # Validate response
+    # -----------------------------------------
+
+    if not response.data:
         raise HTTPException(
             status_code=500,
             detail=(
-                "Image generation returned "
-                "no image."
+                "Gemini returned no image."
             ),
         )
 
-    image_data = result.data[0]
+    image_data = response.data[0]
 
     b64_json = getattr(
         image_data,
@@ -132,27 +215,35 @@ def generate_image(
         raise HTTPException(
             status_code=500,
             detail=(
-                "Image generation returned "
-                "no image data."
+                "Gemini returned no image data."
             ),
         )
+
+    # -----------------------------------------
+    # Decode image
+    # -----------------------------------------
 
     try:
         image_bytes = base64.b64decode(
             b64_json
         )
 
-    except Exception:
+    except Exception as exc:
+        print(
+            "[Image] Base64 decode failed:",
+            repr(exc),
+        )
+
         raise HTTPException(
             status_code=500,
             detail=(
                 "Invalid image data returned "
-                "by image service."
+                "by Gemini."
             ),
         )
 
     # -----------------------------------------
-    # Save generated image
+    # Save image
     # -----------------------------------------
 
     generated_dir = os.path.abspath(
@@ -202,7 +293,6 @@ def generate_image(
             ),
         )
 
-    # Frontend will use this URL.
     image_url = (
         f"/images/generated/"
         f"{current_user.id}/"
@@ -210,8 +300,11 @@ def generate_image(
     )
 
     print(
-        f"[Image] Image saved successfully: "
-        f"{file_path}"
+        "[Image] Image generated successfully"
+    )
+
+    print(
+        f"[Image] Saved: {file_path}"
     )
 
     return {
@@ -219,7 +312,14 @@ def generate_image(
         "image_url": image_url,
         "prompt": prompt,
         "session_id": payload.session_id,
+        "provider": "gemini",
+        "model": settings.GEMINI_IMAGE_MODEL,
     }
+
+
+# -----------------------------------------
+# Serve generated image
+# -----------------------------------------
 
 
 @router.get(
@@ -232,7 +332,7 @@ def get_generated_image(
         auth.get_current_user
     ),
 ):
-    # User can only access their own generated images.
+    # User can only access their own images.
     if str(current_user.id) != str(user_id):
         raise HTTPException(
             status_code=403,
@@ -251,15 +351,15 @@ def get_generated_image(
         filename
     )
 
-    file_path = os.path.join(
-        generated_dir,
-        safe_filename,
+    file_path = os.path.abspath(
+        os.path.join(
+            generated_dir,
+            safe_filename,
+        )
     )
 
-    # Extra path traversal protection.
-    if not os.path.abspath(
-        file_path
-    ).startswith(
+    # Path traversal protection
+    if not file_path.startswith(
         generated_dir + os.sep
     ):
         raise HTTPException(
@@ -272,7 +372,9 @@ def get_generated_image(
     ):
         raise HTTPException(
             status_code=404,
-            detail="Generated image not found.",
+            detail=(
+                "Generated image not found."
+            ),
         )
 
     return FileResponse(

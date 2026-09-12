@@ -2,6 +2,7 @@ export const API_BASE =
     import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 
+
 /* =========================================================
    Authentication Headers
    ========================================================= */
@@ -12,6 +13,37 @@ function authHeaders() {
     return token ? {
         Authorization: `Bearer ${token}`,
     } : {};
+}
+
+export async function fetchGeneratedImage(imageUrl) {
+    const url =
+        imageUrl.startsWith("http://") ||
+        imageUrl.startsWith("https://") ?
+        imageUrl :
+        `${API_BASE.replace(/\/$/, "")}/${imageUrl.replace(
+                  /^\//,
+                  ""
+              )}`;
+
+    const res = await fetch(url, {
+        headers: {
+            ...authHeaders(),
+        },
+    });
+
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+
+        throw new Error(
+            data.detail ||
+            data.message ||
+            "Unable to load generated image."
+        );
+    }
+
+    const blob = await res.blob();
+
+    return URL.createObjectURL(blob);
 }
 
 
@@ -842,7 +874,10 @@ export async function streamQuery({
    Image Generation
    ========================================================= */
 
-export async function generateImage(prompt) {
+export async function generateImage(
+    prompt,
+    sessionId = null
+) {
     const res = await fetch(
         `${API_BASE}/images/generate`,
         {
@@ -853,11 +888,14 @@ export async function generateImage(prompt) {
             },
             body: JSON.stringify({
                 prompt,
+                session_id: sessionId,
             }),
         }
     );
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(
+        () => ({})
+    );
 
     if (!res.ok) {
         throw new Error(
