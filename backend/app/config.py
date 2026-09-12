@@ -15,6 +15,10 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./docchat.db")
 
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+
+    IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gpt-image-2")
+    
     # Optional: comma-separated list of additional free-tier API keys. When
     # set, the app rotates across all of them automatically whenever one
     # hits its daily quota, so total free capacity stacks instead of being

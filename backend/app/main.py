@@ -8,6 +8,7 @@ from .routers import auth as auth_router
 from .routers import documents as documents_router
 from .routers import chat as chat_router
 from .routers import analytics as analytics_router
+from .routers import images as images_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -52,6 +53,7 @@ app.include_router(auth_router.router)
 app.include_router(documents_router.router)
 app.include_router(chat_router.router)
 app.include_router(analytics_router.router)
+app.include_router(images_router.router)
 
 
 @app.get("/health")

@@ -837,3 +837,35 @@ export async function streamQuery({
         }
     }
 }
+
+/* =========================================================
+   Image Generation
+   ========================================================= */
+
+export async function generateImage(prompt) {
+    const res = await fetch(
+        `${API_BASE}/images/generate`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...authHeaders(),
+            },
+            body: JSON.stringify({
+                prompt,
+            }),
+        }
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+        throw new Error(
+            data.detail ||
+            data.message ||
+            "Image generation failed"
+        );
+    }
+
+    return data;
+}
